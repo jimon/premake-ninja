@@ -1,0 +1,60 @@
+--
+-- Name:        premake-ninja/_preload.lua
+-- Purpose:     Define the ninja action.
+-- Author:      Dmitry Ivanov
+-- Created:     2015/07/04
+-- Copyright:   (c) 2015 Dmitry Ivanov
+--
+
+local ninja = premake.modules.ninja
+
+local p = premake
+local solution = premake.solution
+local project = premake.project
+
+newaction
+{
+	-- Metadata for the command line and help system
+	trigger			= "ninja",
+	shortname		= "ninja",
+	description		= "Ninja is a small build system with a focus on speed",
+	module			= "ninja",
+
+	-- The capabilities of this action
+	valid_kinds		= {"ConsoleAp", "WindowedApp", "Makefile", "SharedLib", "StaticLib"}, -- TODO do we need MakeFile ?
+	valid_languages	= {"C", "C++"},
+	valid_tools		= {cc = { "gcc", "clang", "msc" }},
+
+	-- Solution and project generation logic
+	onSolution = function(sln)
+		p.eol("\r\n")
+		p.indent("  ")
+		p.escaper(ninja.esc)
+		p.generate(sln, "build.ninja", ninja.generateSolution)
+	end,
+	onProject = function(prj)
+		p.eol("\r\n")
+		p.indent("  ")
+		p.escaper(ninja.esc)
+		ninja.generateProject(prj)
+	end,
+	onBranch = function(prj)
+		p.eol("\r\n")
+		p.indent("  ")
+		p.escaper(ninja.esc)
+		ninja.generateProject(prj)
+	end,
+	onCleanSolution = function(sln)
+		-- TODO
+	end,
+	onCleanProject = function(prj)
+		-- TODO
+	end,
+	onCleanTarget = function(prj)
+		-- TODO
+	end,
+}
+
+function ninja.esc(value)
+	return value -- TODO
+end
