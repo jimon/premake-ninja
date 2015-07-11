@@ -126,7 +126,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
 		p.w("  description = ar $out")
 		p.w("rule link_" .. cfg.name)
-		p.w("  command = " .. link .. " $in" .. all_ldflags .. " /nologo /link /out:$out")
+		p.w("  command = " .. link .. " $in /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
 	else
@@ -167,7 +167,8 @@ function ninja.generateProjectCfg(cfg)
 		p.w("# link static lib")
 		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
 	elseif cfg.kind == premake.SHAREDLIB then
-		-- TODO
+		p.w("# link shared lib")
+		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
 	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
 		-- TODO windowed app
 		p.w("# link executable")
