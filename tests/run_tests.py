@@ -50,7 +50,9 @@ class Helper(unittest.TestCase):
 			os.path.exists(path) or
 			os.path.exists(path + ".exe") or
 			os.path.exists(path + ".lib") or
-			os.path.exists(path + ".a")
+			os.path.exists(path + ".a") or
+			os.path.exists(path + ".dll") or
+			os.path.exists(path + ".so")
 		)
 
 	# check if executable doesn't exist
@@ -59,7 +61,9 @@ class Helper(unittest.TestCase):
 			os.path.exists(path) or
 			os.path.exists(path + ".exe") or
 			os.path.exists(path + ".lib") or
-			os.path.exists(path + ".a")
+			os.path.exists(path + ".a") or
+			os.path.exists(path + ".dll") or
+			os.path.exists(path + ".so")
 		)
 
 	# check if executable exist
@@ -68,7 +72,7 @@ class Helper(unittest.TestCase):
 			subprocess.check_call([path])
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
-		elif os.path.exists(path + ".lib") or os.path.exists(path + ".a"):
+		elif os.path.exists(path + ".lib") or os.path.exists(path + ".a") or os.path.exists(path + ".dll") or os.path.exists(path + ".so"):
 			pass
 		else:
 			self.assertTrue(False, "executable '" + path + "' doesn't exist")
@@ -135,6 +139,14 @@ class TestStaticLib(Helper):
 		self.out_exist("build/bin_release/ninjatestprj_lib_test1")
 		self.out_exist("build/bin_debug/ninjatestprj_lib_test2")
 		self.out_exist("build/bin_release/ninjatestprj_lib_test2")
+		self.exit_test()
+
+# ----------------------------------------------------- shared lib tests
+class TestSharedLib(Helper):
+	# test simple app
+	def test_simple(self):
+		self.enter_test("shared_lib/simple")
+		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
 		self.exit_test()
 
 # ----------------------------------------------------- entry point
