@@ -107,7 +107,7 @@ function ninja.generateProjectCfg(cfg)
 
 	local all_cflags = buildopt .. cflags .. warnings .. defines .. includes .. forceincludes
 	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
-	local all_ldflags = buildopt .. lddeps .. ldflags .. libs
+	local all_ldflags = buildopt .. lddeps .. ldflags
 
 	local obj_dir = project.getrelative(cfg.project, cfg.objdir)
 
@@ -165,13 +165,13 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build final target
 	if cfg.kind == premake.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " "))
+		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
 	elseif cfg.kind == premake.SHAREDLIB then
 		-- TODO
 	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
 		-- TODO windowed app
 		p.w("# link executable")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " "))
+		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
 	else
 		p.error("ninja action doesn't support this kind " .. cfg.kind)
 	end
