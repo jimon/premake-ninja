@@ -6,8 +6,6 @@
 -- Copyright:   (c) 2015 Dmitry Ivanov
 --
 
-local ninja = premake.modules.ninja
-
 local p = premake
 local solution = premake.solution
 local project = premake.project
@@ -29,20 +27,20 @@ newaction
 	onSolution = function(sln)
 		p.eol("\r\n")
 		p.indent("  ")
-		p.escaper(ninja.esc)
-		p.generate(sln, "build.ninja", ninja.generateSolution)
+		p.escaper(p.modules.ninja.esc)
+		p.generate(sln, "build.ninja", p.modules.ninja.generateSolution)
 	end,
 	onProject = function(prj)
 		p.eol("\r\n")
 		p.indent("  ")
-		p.escaper(ninja.esc)
-		ninja.generateProject(prj)
+		p.escaper(p.modules.ninja.esc)
+		p.modules.ninja.generateProject(prj)
 	end,
 	onBranch = function(prj)
 		p.eol("\r\n")
 		p.indent("  ")
-		p.escaper(ninja.esc)
-		ninja.generateProject(prj)
+		p.escaper(p.modules.ninja.esc)
+		p.modules.ninja.generateProject(prj)
 	end,
 	onCleanSolution = function(sln)
 		-- TODO
@@ -54,7 +52,3 @@ newaction
 		-- TODO
 	end,
 }
-
-function ninja.esc(value)
-	return value -- TODO
-end

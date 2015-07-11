@@ -16,6 +16,10 @@ local fileconfig = p.fileconfig
 premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
+function ninja.esc(value)
+	return value -- TODO
+end
+
 -- generate solution that will call ninja for projects
 function ninja.generateSolution(sln)
 	p.w("# solution build file")
