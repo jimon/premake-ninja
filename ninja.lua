@@ -78,12 +78,23 @@ function ninja.generateProjectCfg(cfg)
 	p.w("# generated with premake ninja")
 	p.w("")
 
-	---------------------------------------------------- figure out settings
-	local cc =		"cl" -- TODO, premake doesn't set tools names for msc
-	local cxx =		"cl" -- TODO
-	local ar =		"link" -- TODO
-	local link =	"cl" -- TODO
+	---------------------------------------------------- figure out toolset executables
+	local cc = ""
+	local cxx = ""
+	local ar = ""
+	local link = ""
+	
+	if cfg.toolset == "msc" then
+		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
+		cc = "cl"
+		cxx = "cl"
+		ar = "lib"
+		link = "cl"
+	else
+		-- TODO
+	end
 
+	---------------------------------------------------- figure out settings
 	local buildopt =		ninja.list(cfg.buildoptions)
 	local cflags =			ninja.list(toolset.getcflags(cfg))
 	local cppflags =		ninja.list(toolset.getcppflags(cfg))
@@ -113,9 +124,9 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  command = " .. cc .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
-		--p.w("rule ar")
-		--p.w("  command = $ar ") -- TODO
-		--p.w("  description = ar $out")
+		p.w("rule ar_" .. cfg.name)
+		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
+		p.w("  description = ar $out")
 		p.w("rule link_" .. cfg.name)
 		p.w("  command = " .. link .. " $in" .. all_ldflags .. " /nologo /link /out:$out")
 		p.w("  description = link $out")
@@ -155,10 +166,16 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- build final target
 	if cfg.kind == premake.STATICLIB then
+		p.w("# link static lib")
+		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " "))
+	elseif cfg.kind == premake.SHAREDLIB then
 		-- TODO
-	else
-		p.w("# link")
+	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
+		-- TODO windowed app
+		p.w("# link executable")
 		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " "))
+	else
+		p.error("ninja action doesn't support this kind " .. cfg.kind)
 	end
 end
 

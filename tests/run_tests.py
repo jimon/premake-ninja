@@ -45,12 +45,22 @@ class Helper(unittest.TestCase):
 			"looks like ninja failed")
 
 	# check if executable exist
-	def exe_exist(self, path):
-		self.assertTrue(os.path.exists(path) or os.path.exists(path + ".exe"))
+	def out_exist(self, path):
+		self.assertTrue(
+			os.path.exists(path) or
+			os.path.exists(path + ".exe") or
+			os.path.exists(path + ".lib") or
+			os.path.exists(path + ".a")
+		)
 
 	# check if executable doesn't exist
-	def exe_not_exist(self, path):
-		self.assertFalse(os.path.exists(path) or os.path.exists(path + ".exe"))
+	def out_not_exist(self, path):
+		self.assertFalse(
+			os.path.exists(path) or
+			os.path.exists(path + ".exe") or
+			os.path.exists(path + ".lib") or
+			os.path.exists(path + ".a")
+		)
 
 	# check if executable exist
 	def exe(self, path):
@@ -58,11 +68,13 @@ class Helper(unittest.TestCase):
 			subprocess.check_call([path])
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
+		elif os.path.exists(path + ".lib") or os.path.exists(path + ".a"):
+			pass
 		else:
 			self.assertTrue(False, "executable '" + path + "' doesn't exist")
 
 	# check basic flow, run debug and release executables
-	def check_basics(self, exe_debug, exe_release, build_dir = "build"):
+	def check_basics(self, out_debug, out_release, build_dir = "build"):
 		# build dir should not exist before premake is called
 		self.assertFalse(os.path.exists(build_dir))
 
@@ -70,28 +82,28 @@ class Helper(unittest.TestCase):
 		# build dir should exist afterwards, but executables shouldn't
 		self.premake() 
 		self.assertTrue(os.path.exists(build_dir))
-		self.exe_not_exist(exe_debug)
-		self.exe_not_exist(exe_release)
+		self.out_not_exist(out_debug)
+		self.out_not_exist(out_release)
 
 		# call ninja, by default ninja should build debug target
 		# so debug executable should exist, and release shouldn't
 		self.ninja()
-		self.exe_exist(exe_debug)
-		self.exe_not_exist(exe_release)
+		self.out_exist(out_debug)
+		self.out_not_exist(out_release)
 
 		# let's build debug target explicitly, and still release executable shouldn't exist
 		self.ninja("debug")
-		self.exe_exist(exe_debug)
-		self.exe_not_exist(exe_release)
+		self.out_exist(out_debug)
+		self.out_not_exist(out_release)
 
 		# let's build release target explicitly, all basic executables should exist now
 		self.ninja("release")
-		self.exe_exist(exe_debug)
-		self.exe_exist(exe_release)
+		self.out_exist(out_debug)
+		self.out_exist(out_release)
 
 		# run executables to check if they are valid
-		self.exe(exe_debug)
-		self.exe(exe_release)
+		self.exe(out_debug)
+		self.exe(out_release)
 
 # ----------------------------------------------------- console app tests
 class TestConsoleApp(Helper):
@@ -104,6 +116,14 @@ class TestConsoleApp(Helper):
 	# test include path app
 	def test_include_path(self):
 		self.enter_test("console_app/includepath")
+		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
+		self.exit_test()
+
+# ----------------------------------------------------- static lib tests
+class TestStaticLib(Helper):
+	# test simple app
+	def test_simple(self):
+		self.enter_test("static_lib/simple")
 		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
 		self.exit_test()
 
