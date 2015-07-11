@@ -26,7 +26,7 @@ class Helper(unittest.TestCase):
 	def exit_test(self, build_dir = "build"):
 		# for some reason call/check_call are not waiting for executable to completely finish
 		# so let's wait a bit so we can remove folder safely
-		time.sleep(0.1) 
+		time.sleep(0.2)
 		self.clear(build_dir)
 		os.chdir(current_cwd)
 
@@ -147,6 +147,16 @@ class TestSharedLib(Helper):
 	def test_simple(self):
 		self.enter_test("shared_lib/simple")
 		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
+		self.exit_test()
+
+	# test shared lib with app
+	def test_withapp(self):
+		self.enter_test("shared_lib/withapp")
+		self.check_basics("build/bin_debug/ninjatestprj_app", "build/bin_release/ninjatestprj_app")
+		self.out_exist("build/bin_debug/ninjatestprj_lib_test1")
+		self.out_exist("build/bin_release/ninjatestprj_lib_test1")
+		self.out_exist("build/bin_debug/ninjatestprj_lib_test2")
+		self.out_exist("build/bin_release/ninjatestprj_lib_test2")
 		self.exit_test()
 
 # ----------------------------------------------------- entry point
