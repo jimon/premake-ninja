@@ -25,31 +25,29 @@ function ninja.generateSolution(sln)
 	p.w("# solution build file")
 	p.w("# generated with premake ninja")
 	p.w("")
-	p.w("rule ninja")
-	p.w("  command = ninja -f $in")
-	p.w("")
 
 	p.w("# build projects")
-	local cfgs = {}
+	local cfgs = {} -- key is configuration name, value is string of outputs names
 	local cfg_first = nil
 	for prj in solution.eachproject(sln) do
 		for cfg in project.eachconfig(prj) do
-			if not cfgs[cfg] then cfgs[cfg] = "" end
-			if cfg_first == nil then cfg_first = cfg.name end
-			cfgs[cfg] = cfgs[cfg] .. ninja.outputFilename(cfg) .. " "
 
-			-- well ninja does not have any way to output implicit dependencies, so let's do it by hand
-			-- TODO add premake prj dependencies
-			local all_files = ""
-			tree.traverse(project.getsourcetree(prj), {onleaf = function(node, depth) all_files = all_files .. node.relpath .. " " end,}, false, 1)
-			p.w("build " .. ninja.outputFilename(cfg) .. ": ninja " .. ninja.projectCfgFilename(cfg) .. " | " .. all_files)
+			-- fill list of output files
+			if not cfgs[cfg.name] then cfgs[cfg.name] = "" end
+			cfgs[cfg.name] = cfgs[cfg.name] .. ninja.outputFilename(cfg) .. " "
+
+			-- set first configuration name
+			if cfg_first == nil then cfg_first = cfg.name end
+
+			-- include other ninja file
+			p.w("subninja " .. ninja.projectCfgFilename(cfg))
 		end
 	end
 	p.w("")
 
 	p.w("# targets")
-	for cfg, prjs in pairs(cfgs) do
-		p.w("build " .. cfg.name .. ": phony " .. prjs)
+	for cfg, outputs in pairs(cfgs) do
+		p.w("build " .. cfg .. ": phony " .. outputs)
 	end
 	p.w("")
 
