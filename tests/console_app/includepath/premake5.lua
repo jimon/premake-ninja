@@ -11,6 +11,7 @@ project "ninjatestprj"
 	targetdir "build/bin_%{cfg.buildcfg}"
 
 	files {"**.cpp", "**.c", "**.h"}
+	includedirs {"test1", "test2"}
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
