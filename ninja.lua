@@ -101,13 +101,13 @@ function ninja.generateProjectCfg(cfg)
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes =		ninja.list(premake.esc(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs)))
 	local forceincludes =	ninja.list(premake.esc(toolset.getforceincludes(cfg))) -- TODO pch
-	local lddeps =			ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+	local lddeps = 			ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
-	local libs =			ninja.list(toolset.getlinks(cfg))
+	local libs =			ninja.list(toolset.getlinks(cfg)) .. lddeps
 
 	local all_cflags = buildopt .. cflags .. warnings .. defines .. includes .. forceincludes
 	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
-	local all_ldflags = buildopt .. lddeps .. ldflags
+	local all_ldflags = buildopt .. ldflags
 
 	local obj_dir = project.getrelative(cfg.project, cfg.objdir)
 
@@ -166,13 +166,29 @@ function ninja.generateProjectCfg(cfg)
 	if cfg.kind == premake.STATICLIB then
 		p.w("# link static lib")
 		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+
 	elseif cfg.kind == premake.SHAREDLIB then
+		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. output .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+
+		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
+		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
+		-- and we use .lib/.a later on as dependency for linkage
+		-- so let's create phony build statements for this, not sure if it's the best solution
+		if ninja.endsWith(output, ".dll") then
+			p.w("build " .. ninja.noext(output, ".dll") .. ".lib: phony " .. output)
+		elseif ninja.endsWith(output, ".so") then
+			p.w("build " .. ninja.noext(output, ".so") .. ".a: phony " .. output)
+		else
+			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
+		end
+
 	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
 		-- TODO windowed app
 		p.w("# link executable")
 		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+
 	else
 		p.error("ninja action doesn't support this kind " .. cfg.kind)
 	end
@@ -186,6 +202,16 @@ end
 -- return name of build file for configuration
 function ninja.projectCfgFilename(cfg)
 	return "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
+end
+
+-- check if string ends with string
+function ninja.endsWith(str, ends)
+	return str:sub(-ends:len()) == ends
+end
+
+-- removes extension from string
+function ninja.noext(str, ext)
+	return str:sub(0, str:len() - ext:len())
 end
 
 -- generate all build files for every project configuration
