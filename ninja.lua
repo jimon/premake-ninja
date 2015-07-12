@@ -112,20 +112,20 @@ function ninja.generateProjectCfg(cfg)
 	local obj_dir = project.getrelative(cfg.project, cfg.objdir)
 
 	---------------------------------------------------- write rules
-	p.w("# core rules")
+	p.w("# core rules for " .. cfg.name)
 	if cfg.toolset == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
-		p.w("rule cc_" .. cfg.name)
+		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
-		p.w("rule cxx_" .. cfg.name)
+		p.w("rule cxx")
 		p.w("  command = " .. cc .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
-		p.w("rule ar_" .. cfg.name)
+		p.w("rule ar")
 		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
 		p.w("  description = ar $out")
-		p.w("rule link_" .. cfg.name)
+		p.w("rule link")
 		p.w("  command = " .. link .. " $in /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
@@ -153,7 +153,7 @@ function ninja.generateProjectCfg(cfg)
 			-- TODO
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
-			p.w("build " .. objfilename .. ": cxx_" .. cfg.name .. " " .. node.relpath)
+			p.w("build " .. objfilename .. ": cxx " .. node.relpath)
 			objfiles[#objfiles + 1] = objfilename
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
@@ -165,12 +165,12 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build final target
 	if cfg.kind == premake.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": ar_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. ninja.outputFilename(cfg) .. ": ar " .. table.concat(objfiles, " ") .. " " .. libs)
 
 	elseif cfg.kind == premake.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. output .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. output .. ": link " .. table.concat(objfiles, " ") .. " " .. libs)
 
 		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
 		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
@@ -187,10 +187,10 @@ function ninja.generateProjectCfg(cfg)
 	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
 		-- TODO windowed app
 		p.w("# link executable")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": link_" .. cfg.name .. " " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. ninja.outputFilename(cfg) .. ": link " .. table.concat(objfiles, " ") .. " " .. libs)
 
 	else
-		p.error("ninja action doesn't support this kind " .. cfg.kind)
+		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
 end
 
