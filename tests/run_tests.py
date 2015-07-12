@@ -18,6 +18,7 @@ class Helper(unittest.TestCase):
 
 	# enters test, and clears it
 	def enter_test(self, test, build_dir = "build"):
+		self.build_dir = build_dir
 		os.chdir(current_cwd) # if previous test failed then we need to restore cwd
 		os.chdir(test)
 		self.clear(build_dir)
@@ -32,47 +33,61 @@ class Helper(unittest.TestCase):
 
 	# call premake in the test
 	def premake(self):
-		self.assertEqual(
-			subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0,
-			"looks like premake failed")
+		self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0, "looks like premake failed")
 
 	# call ninja in the test
 	def ninja(self, target = None):
 		args = ["ninja", "-C", "build"]
 		if target is not None:
 			args.append(target)
-		self.assertEqual(subprocess.call(args), 0,
-			"looks like ninja failed")
+		self.assertEqual(subprocess.call(args), 0, "looks like ninja failed")
+
+	# get out name with ext and prefix
+	def out_name(self, path, ext = None, prefix = None):
+		if (ext == None) and (prefix == None):
+			return path
+		base_path = os.path.dirname(path)
+		base_name_and_ext = os.path.splitext(os.path.basename(path))
+		if prefix == None:
+			prefix = ""
+		if ext == None:
+			ext = base_name_and_ext[1]
+		return base_path + "/" + prefix +base_name_and_ext[0] + ext
 
 	# check if executable exist
 	def out_exist(self, path):
 		self.assertTrue(
 			os.path.exists(path) or
-			os.path.exists(path + ".exe") or
-			os.path.exists(path + ".lib") or
-			os.path.exists(path + ".a") or
-			os.path.exists(path + ".dll") or
-			os.path.exists(path + ".so")
+			os.path.exists(self.out_name(path, ".exe")) or
+			os.path.exists(self.out_name(path, ".lib")) or
+			os.path.exists(self.out_name(path, ".a", "lib")) or
+			os.path.exists(self.out_name(path, ".dll")) or
+			os.path.exists(self.out_name(path, ".so")) or
+			os.path.exists(self.out_name(path, ".dylib", "lib"))
 		)
 
 	# check if executable doesn't exist
 	def out_not_exist(self, path):
 		self.assertFalse(
-			os.path.exists(path) or
-			os.path.exists(path + ".exe") or
-			os.path.exists(path + ".lib") or
-			os.path.exists(path + ".a") or
-			os.path.exists(path + ".dll") or
-			os.path.exists(path + ".so")
+			 os.path.exists(path) or
+			 os.path.exists(self.out_name(path, ".exe")) or
+			 os.path.exists(self.out_name(path, ".lib")) or
+			 os.path.exists(self.out_name(path, ".a", "lib")) or
+			 os.path.exists(self.out_name(path, ".dll")) or
+			 os.path.exists(self.out_name(path, ".so")) or
+			 os.path.exists(self.out_name(path, ".dylib", "lib"))
 		)
 
 	# check if executable exist
 	def exe(self, path):
 		if os.path.exists(path):
-			subprocess.check_call([path])
+			current_cwd = os.getcwd()
+			os.chdir(self.build_dir)
+			subprocess.check_call([os.path.relpath(path, self.build_dir)])
+			os.chdir(current_cwd)
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
-		elif os.path.exists(path + ".lib") or os.path.exists(path + ".a") or os.path.exists(path + ".dll") or os.path.exists(path + ".so"):
+		elif os.path.exists(self.out_name(path, ".lib")) or os.path.exists(self.out_name(path, ".a", "lib")) or os.path.exists(self.out_name(path, ".dll")) or os.path.exists(self.out_name(path, ".so")) or os.path.exists(self.out_name(path, ".dylib", "lib")):
 			pass
 		else:
 			self.assertTrue(False, "executable '" + path + "' doesn't exist")
@@ -84,7 +99,7 @@ class Helper(unittest.TestCase):
 
 		# call premake
 		# build dir should exist afterwards, but executables shouldn't
-		self.premake() 
+		self.premake()
 		self.assertTrue(os.path.exists(build_dir))
 		self.out_not_exist(out_debug)
 		self.out_not_exist(out_release)
