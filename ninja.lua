@@ -65,8 +65,15 @@ end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
-	if cfg.toolset == nil then
-		cfg.toolset = "msc" -- TODO why premake doesn't provide default name always ?
+	if cfg.toolset == nil then -- TODO why premake doesn't provide default name always ?
+		if cfg.system == "windows" then
+			cfg.toolset = "msc"
+		elseif cfg.system == "macosx" then
+			cfg.toolset = "clang"
+		else
+			cfg.toolset = "gcc"
+			p.warnOnce("unknown_system", "no toolchain set and unknown system " .. cfg.system .. " so assuming toolchain is gcc")
+		end
 	end
 
 	local prj = cfg.project
@@ -88,8 +95,15 @@ function ninja.generateProjectCfg(cfg)
 		cxx = "cl"
 		ar = "lib"
 		link = "cl"
-	else
+	elseif cfg.toolset == "clang" then
+		cc = toolset:gettoolname("cc")
+		cxx = toolset:gettoolname("cxx")
+		ar = toolset:gettoolname("ar")
+		link = toolset:gettoolname("cc")
+	elseif cfg.toolset == "gcc" then
 		-- TODO
+	else
+		p.error("unknown toolchain " .. cfg.toolset)
 	end
 
 	---------------------------------------------------- figure out settings
@@ -97,13 +111,24 @@ function ninja.generateProjectCfg(cfg)
 	local cflags =			ninja.list(toolset.getcflags(cfg))
 	local cppflags =		ninja.list(toolset.getcppflags(cfg))
 	local cxxflags =		ninja.list(toolset.getcxxflags(cfg))
-	local warnings =		ninja.list(toolset.getwarnings(cfg))
+	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes =		ninja.list(premake.esc(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs)))
 	local forceincludes =	ninja.list(premake.esc(toolset.getforceincludes(cfg))) -- TODO pch
-	local lddeps = 			ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
-	local libs =			ninja.list(toolset.getlinks(cfg)) .. lddeps
+	local libs =			""
+
+	if cfg.toolset == "msc" then
+		warnings = ninja.list(toolset.getwarnings(cfg))
+		libs = ninja.list(toolset.getlinks(cfg)) .. ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+	elseif cfg.toolset == "clang" then
+		libs = ninja.list(toolset.getlinks(cfg))
+	end
+
+	-- experimental feature, change install_name of shared libs
+	--if (cfg.toolset == "clang") and (cfg.kind == premake.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
+	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
+	--end
 
 	local all_cflags = buildopt .. cflags .. warnings .. defines .. includes .. forceincludes
 	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
@@ -116,20 +141,44 @@ function ninja.generateProjectCfg(cfg)
 	if cfg.toolset == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
-		p.w("  description = cxx $out")
+		p.w("  description = cc $out")
 		p.w("  deps = msvc")
+		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cc .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
+		p.w("  command = " .. cxx .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
+		p.w("")
 		p.w("rule ar")
 		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
 		p.w("  description = ar $out")
+		p.w("")
 		p.w("rule link")
 		p.w("  command = " .. link .. " $in /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
-	else
+	elseif cfg.toolset == "clang" then
+		p.w("rule cc")
+		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cc $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule cxx")
+		p.w("  command = " .. cxx .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cxx $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule ar")
+		p.w("  command = " .. ar .. " rcs $out $in")
+		p.w("  description = ar $out")
+		p.w("")
+		p.w("rule link")
+		p.w("  command = " .. link .. all_ldflags .. " -o $out $in")
+		p.w("  description = link $out")
+		p.w("")
+	elseif cfg.toolset == "gcc" then
 		-- TODO
 	end
 
@@ -153,8 +202,12 @@ function ninja.generateProjectCfg(cfg)
 			-- TODO
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
-			p.w("build " .. objfilename .. ": cxx " .. node.relpath)
 			objfiles[#objfiles + 1] = objfilename
+			if ninja.endsWith(node.relpath, ".c") then
+				p.w("build " .. objfilename .. ": cc " .. node.relpath)
+			else
+				p.w("build " .. objfilename .. ": cxx " .. node.relpath)
+			end
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
 		end
@@ -180,12 +233,13 @@ function ninja.generateProjectCfg(cfg)
 			p.w("build " .. ninja.noext(output, ".dll") .. ".lib: phony " .. output)
 		elseif ninja.endsWith(output, ".so") then
 			p.w("build " .. ninja.noext(output, ".so") .. ".a: phony " .. output)
+		elseif ninja.endsWith(output, ".dylib") then
+			-- but in case of .dylib there are no corresponding .a file
 		else
 			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
 		end
 
 	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
-		-- TODO windowed app
 		p.w("# link executable")
 		p.w("build " .. ninja.outputFilename(cfg) .. ": link " .. table.concat(objfiles, " ") .. " " .. libs)
 
@@ -202,6 +256,11 @@ end
 -- return name of build file for configuration
 function ninja.projectCfgFilename(cfg)
 	return "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
+end
+
+-- check if string starts with string
+function ninja.startsWith(str, starts)
+	return str:sub(0, starts:len()) == starts
 end
 
 -- check if string ends with string
