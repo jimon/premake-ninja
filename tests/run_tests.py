@@ -159,6 +159,14 @@ class TestSharedLib(Helper):
 		self.out_exist("build/bin_release/ninjatestprj_lib_test2")
 		self.exit_test()
 
+# ----------------------------------------------------- windowed app tests
+class TestWindowedApp(Helper):
+	# test simple app
+	def test_simple(self):
+		self.enter_test("windowed_app/simple")
+		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
+		self.exit_test()
+
 # ----------------------------------------------------- entry point
 if __name__ == "__main__":
 	unittest.main()
