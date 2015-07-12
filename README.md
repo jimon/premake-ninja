@@ -12,7 +12,6 @@ Build.ninja file sets phony targets for configuration names so you can build the
 
 - ninja escaper is not implemented
 - gcc toolchain is not supported
-- clang toolchain is not supported
 - PCH not supported
 - Resources are not supported
 - Custom build rules are not supported 
@@ -32,8 +31,12 @@ Build.ninja file sets phony targets for configuration names so you can build the
 	- not tested
 - clang / linux
 	- not tested
-- clang / os x
-	- not tested
+- clang / osx
+	- ConsoleApp works
+	- WindowedApp works 
+	- StaticLib works
+	- SharedLib works
+	- x86_64 tested, x86 not tested
 - gcc / win
 	- not tested
 - gcc / linux
