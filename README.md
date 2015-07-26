@@ -39,5 +39,10 @@ Build.ninja file sets phony targets for configuration names so you can build the
 	- x86_64 tested, x86 not tested
 - gcc / win
 	- not tested
-- gcc / linux
-	- not tested
+- gcc / linux (tested on Ubuntu 15.04)
+	- ConsoleApp works
+	- WindowedApp works 
+	- StaticLib works
+	- SharedLib works
+	- x86_64 tested, x86 not tested
+

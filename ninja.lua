@@ -70,6 +70,8 @@ function ninja.generateProjectCfg(cfg)
 			cfg.toolset = "msc"
 		elseif cfg.system == "macosx" then
 			cfg.toolset = "clang"
+		elseif cfg.system == "linux" then
+			cfg.toolset = "gcc"
 		else
 			cfg.toolset = "gcc"
 			p.warnOnce("unknown_system", "no toolchain set and unknown system " .. cfg.system .. " so assuming toolchain is gcc")
@@ -81,6 +83,11 @@ function ninja.generateProjectCfg(cfg)
 
 	p.w("# project build file")
 	p.w("# generated with premake ninja")
+	p.w("")
+
+	-- premake-ninja relies on scoped rules
+	-- and they were added in ninja v1.6
+	p.w("ninja_required_version = 1.6")
 	p.w("")
 
 	---------------------------------------------------- figure out toolset executables
@@ -101,7 +108,11 @@ function ninja.generateProjectCfg(cfg)
 		ar = toolset:gettoolname("ar")
 		link = toolset:gettoolname("cc")
 	elseif cfg.toolset == "gcc" then
-		-- TODO
+		if not cfg.gccprefix then cfg.gccprefix = "" end
+		cc = toolset.gettoolname(cfg, "cc")
+		cxx = toolset.gettoolname(cfg, "cxx")
+		ar = toolset.gettoolname(cfg, "ar")
+		link = toolset.gettoolname(cfg, "cc")
 	else
 		p.error("unknown toolchain " .. cfg.toolset)
 	end
@@ -124,6 +135,8 @@ function ninja.generateProjectCfg(cfg)
 		-- because system libraries are often not in PATH so ninja can't find them
 		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif cfg.toolset == "clang" then
+		libs = ninja.list(toolset.getlinks(cfg))
+	elseif cfg.toolset == "gcc" then
 		libs = ninja.list(toolset.getlinks(cfg))
 	end
 
@@ -181,7 +194,26 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	elseif cfg.toolset == "gcc" then
-		-- TODO
+		p.w("rule cc")
+		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cc $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule cxx")
+		p.w("  command = " .. cxx .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cxx $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule ar")
+		p.w("  command = " .. ar .. " rcs $out $in")
+		p.w("  description = ar $out")
+		p.w("")
+		p.w("rule link")
+		p.w("  command = " .. link .. all_ldflags .. " -o $out $in")
+		p.w("  description = link $out")
+		p.w("")
 	end
 
 	---------------------------------------------------- build all files
@@ -231,6 +263,7 @@ function ninja.generateProjectCfg(cfg)
 		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
 		-- and we use .lib/.a later on as dependency for linkage
 		-- so let's create phony build statements for this, not sure if it's the best solution
+		-- UPD this can be fixed by https://github.com/martine/ninja/pull/989
 		if ninja.endsWith(output, ".dll") then
 			p.w("build " .. ninja.noext(output, ".dll") .. ".lib: phony " .. output)
 		elseif ninja.endsWith(output, ".so") then

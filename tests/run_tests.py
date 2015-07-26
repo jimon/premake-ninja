@@ -62,7 +62,7 @@ class Helper(unittest.TestCase):
 			os.path.exists(self.out_name(path, ".lib")) or
 			os.path.exists(self.out_name(path, ".a", "lib")) or
 			os.path.exists(self.out_name(path, ".dll")) or
-			os.path.exists(self.out_name(path, ".so")) or
+			os.path.exists(self.out_name(path, ".so", "lib")) or
 			os.path.exists(self.out_name(path, ".dylib", "lib"))
 		)
 
@@ -74,7 +74,7 @@ class Helper(unittest.TestCase):
 			 os.path.exists(self.out_name(path, ".lib")) or
 			 os.path.exists(self.out_name(path, ".a", "lib")) or
 			 os.path.exists(self.out_name(path, ".dll")) or
-			 os.path.exists(self.out_name(path, ".so")) or
+			 os.path.exists(self.out_name(path, ".so", "lib")) or
 			 os.path.exists(self.out_name(path, ".dylib", "lib"))
 		)
 
@@ -87,7 +87,7 @@ class Helper(unittest.TestCase):
 			os.chdir(current_cwd)
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
-		elif os.path.exists(self.out_name(path, ".lib")) or os.path.exists(self.out_name(path, ".a", "lib")) or os.path.exists(self.out_name(path, ".dll")) or os.path.exists(self.out_name(path, ".so")) or os.path.exists(self.out_name(path, ".dylib", "lib")):
+		elif os.path.exists(self.out_name(path, ".lib")) or os.path.exists(self.out_name(path, ".a", "lib")) or os.path.exists(self.out_name(path, ".dll")) or os.path.exists(self.out_name(path, ".so", "lib")) or os.path.exists(self.out_name(path, ".dylib", "lib")):
 			pass
 		else:
 			self.assertTrue(False, "executable '" + path + "' doesn't exist")
