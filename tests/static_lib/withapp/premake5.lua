@@ -15,8 +15,10 @@ project "ninjatestprj_app"
 	links {"ninjatestprj_lib_test1", "ninjatestprj_lib_test2"}
 
 	configuration "windows"
-	   links { "user32", "gdi32" }
+		links { "user32", "gdi32" }
 
+	configuration "linux"
+		links { "pthread" }
 	-- todo add system libs for os x and linux
 
 	filter "configurations:debug"

@@ -135,9 +135,9 @@ function ninja.generateProjectCfg(cfg)
 		-- because system libraries are often not in PATH so ninja can't find them
 		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif cfg.toolset == "clang" then
-		libs = ninja.list(toolset.getlinks(cfg))
+		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif cfg.toolset == "gcc" then
-		libs = ninja.list(toolset.getlinks(cfg))
+		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	end
 
 	-- experimental feature, change install_name of shared libs
@@ -190,7 +190,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " -o $out $in")
+		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(toolset.getlinks(cfg)) .. " -o $out $in")
 		p.w("  description = link $out")
 		p.w("")
 	elseif cfg.toolset == "gcc" then
@@ -211,7 +211,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " -o $out $in")
+		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(toolset.getlinks(cfg)) .. " -o $out $in")
 		p.w("  description = link $out")
 		p.w("")
 	end
