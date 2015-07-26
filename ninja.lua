@@ -120,7 +120,9 @@ function ninja.generateProjectCfg(cfg)
 
 	if cfg.toolset == "msc" then
 		warnings = ninja.list(toolset.getwarnings(cfg))
-		libs = ninja.list(toolset.getlinks(cfg)) .. ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+		-- we don't pass getlinks(cfg) through dependencies
+		-- because system libraries are often not in PATH so ninja can't find them
+		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif cfg.toolset == "clang" then
 		libs = ninja.list(toolset.getlinks(cfg))
 	end
@@ -154,7 +156,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " $in /link " .. all_ldflags .. " /nologo /out:$out")
+		p.w("  command = " .. link .. " $in " .. ninja.list(toolset.getlinks(cfg)) .. " /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
 	elseif cfg.toolset == "clang" then

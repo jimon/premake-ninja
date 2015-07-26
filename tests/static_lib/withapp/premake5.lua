@@ -14,6 +14,11 @@ project "ninjatestprj_app"
 	includedirs {"test1", "test2"}
 	links {"ninjatestprj_lib_test1", "ninjatestprj_lib_test2"}
 
+	configuration "windows"
+	   links { "user32", "gdi32" }
+
+	-- todo add system libs for os x and linux
+
 	filter "configurations:debug"
 		defines {"DEBUG"}
 		flags {"Symbols"}

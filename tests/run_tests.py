@@ -27,7 +27,7 @@ class Helper(unittest.TestCase):
 	def exit_test(self, build_dir = "build"):
 		# for some reason call/check_call are not waiting for executable to completely finish
 		# so let's wait a bit so we can remove folder safely
-		time.sleep(0.2)
+		time.sleep(0.3)
 		self.clear(build_dir)
 		os.chdir(current_cwd)
 
