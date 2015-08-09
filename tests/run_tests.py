@@ -1,13 +1,18 @@
 # unittests for premake-ninja
 
 import os
+import sys
 import time
 import shutil
+import platform
 import unittest
 import subprocess
 
 # we are changing working directory often in this tests, so let's save current one
 current_cwd = os.getcwd()
+
+# if set, will override compiler name when premake is executed
+override_compiler = None
 
 # ----------------------------------------------------- helper class
 class Helper(unittest.TestCase):
@@ -33,7 +38,10 @@ class Helper(unittest.TestCase):
 
 	# call premake in the test
 	def premake(self):
-		self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0, "looks like premake failed")
+		if override_compiler:
+			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "--cc=" + override_compiler, "ninja"]), 0, "looks like premake failed")
+		else:
+			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0, "looks like premake failed")
 
 	# call ninja in the test
 	def ninja(self, target = None):
@@ -184,4 +192,12 @@ class TestWindowedApp(Helper):
 
 # ----------------------------------------------------- entry point
 if __name__ == "__main__":
-	unittest.main()
+	print("-------------------------- test default setup")
+	r = unittest.main(exit = False)
+	if not r.result.wasSuccessful():
+		sys.exit(1)
+
+	if platform.system() == "Windows" and shutil.which("gcc"):
+		print("-------------------------- found gcc on windows")
+		override_compiler = "gcc"
+		unittest.main()
