@@ -17,6 +17,14 @@ premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
 function ninja.esc(value)
+	-- str = str.replace("$", "$$").replace(":", "$:").replace("\n", "$\n")
+
+	--print("'" .. value .. "'")
+	value = string.gsub(value, "%$", "$$")
+	value = string.gsub(value, ":", "$:")
+	value = string.gsub(value, "\n", "$\n")
+	value = string.gsub(value, " ", "$ ")
+	--print("'" .. value .. "'")
 	return value -- TODO
 end
 
@@ -34,13 +42,13 @@ function ninja.generateSolution(sln)
 
 			-- fill list of output files
 			if not cfgs[cfg.name] then cfgs[cfg.name] = "" end
-			cfgs[cfg.name] = cfgs[cfg.name] .. ninja.outputFilename(cfg) .. " "
+			cfgs[cfg.name] = cfgs[cfg.name] .. p.esc(ninja.outputFilename(cfg)) .. " "
 
 			-- set first configuration name
 			if cfg_first == nil then cfg_first = cfg.name end
 
 			-- include other ninja file
-			p.w("subninja " .. ninja.projectCfgFilename(cfg))
+			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg)))
 		end
 	end
 	p.w("")
@@ -82,7 +90,7 @@ function ninja.generateProjectCfg(cfg)
 	end
 
 	local prj = cfg.project
-	local toolset = premake.tools[toolset_name]
+	local toolset = p.tools[toolset_name]
 
 	p.w("# project build file")
 	p.w("# generated with premake ninja")
@@ -127,8 +135,8 @@ function ninja.generateProjectCfg(cfg)
 	local cxxflags =		ninja.list(toolset.getcxxflags(cfg))
 	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes =		ninja.list(premake.esc(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs)))
-	local forceincludes =	ninja.list(premake.esc(toolset.getforceincludes(cfg))) -- TODO pch
+	local includes =		ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
+	local forceincludes =	ninja.list(toolset.getforceincludes(cfg)) -- TODO pch
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 	local libs =			""
 
@@ -136,15 +144,15 @@ function ninja.generateProjectCfg(cfg)
 		warnings = ninja.list(toolset.getwarnings(cfg))
 		-- we don't pass getlinks(cfg) through dependencies
 		-- because system libraries are often not in PATH so ninja can't find them
-		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif toolset_name == "clang" then
-		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	elseif toolset_name == "gcc" then
-		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
+		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	end
 
 	-- experimental feature, change install_name of shared libs
-	--if (toolset_name == "clang") and (cfg.kind == premake.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
+	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
 
@@ -241,9 +249,9 @@ function ninja.generateProjectCfg(cfg)
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.relpath, ".c") then
-				p.w("build " .. objfilename .. ": cc " .. node.relpath)
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath))
 			else
-				p.w("build " .. objfilename .. ": cxx " .. node.relpath)
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath))
 			end
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
@@ -253,14 +261,14 @@ function ninja.generateProjectCfg(cfg)
 	p.w("")
 
 	---------------------------------------------------- build final target
-	if cfg.kind == premake.STATICLIB then
+	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": ar " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
 
-	elseif cfg.kind == premake.SHAREDLIB then
+	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. output .. ": link " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
 
 		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
 		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
@@ -268,18 +276,18 @@ function ninja.generateProjectCfg(cfg)
 		-- so let's create phony build statements for this, not sure if it's the best solution
 		-- UPD this can be fixed by https://github.com/martine/ninja/pull/989
 		if ninja.endsWith(output, ".dll") then
-			p.w("build " .. ninja.noext(output, ".dll") .. ".lib: phony " .. output)
+			p.w("build " .. p.esc(ninja.noext(output, ".dll")) .. ".lib: phony " .. p.esc(output))
 		elseif ninja.endsWith(output, ".so") then
-			p.w("build " .. ninja.noext(output, ".so") .. ".a: phony " .. output)
+			p.w("build " .. p.esc(ninja.noext(output, ".so")) .. ".a: phony " .. p.esc(output))
 		elseif ninja.endsWith(output, ".dylib") then
 			-- but in case of .dylib there are no corresponding .a file
 		else
 			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
 		end
 
-	elseif (cfg.kind == premake.CONSOLEAPP) or (cfg.kind == premake.WINDOWEDAPP) then
+	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		p.w("build " .. ninja.outputFilename(cfg) .. ": link " .. table.concat(objfiles, " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)

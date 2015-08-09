@@ -150,8 +150,8 @@ class TestStaticLib(Helper):
 	def test_withapp(self):
 		self.enter_test("static_lib/withapp")
 		self.check_basics("build/bin_debug/ninjatestprj_app", "build/bin_release/ninjatestprj_app")
-		self.out_exist("build/bin_debug/ninjatestprj_lib_test1")
-		self.out_exist("build/bin_release/ninjatestprj_lib_test1")
+		self.out_exist("build/bin_debug/ninjatestprj_lib test1")
+		self.out_exist("build/bin_release/ninjatestprj_lib test1")
 		self.out_exist("build/bin_debug/ninjatestprj_lib_test2")
 		self.out_exist("build/bin_release/ninjatestprj_lib_test2")
 		self.exit_test()

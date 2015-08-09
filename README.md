@@ -10,7 +10,6 @@ Build.ninja file sets phony targets for configuration names so you can build the
 
 ### TODO
 
-- ninja escaper is not implemented
 - PCH not supported
 - Resources are not supported
 - Custom build rules are not supported 
