@@ -17,10 +17,29 @@ premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
 function ninja.esc(value)
-	value = string.gsub(value, "%$", "$$") -- TODO maybe there is better way
-	value = string.gsub(value, ":", "$:")
-	value = string.gsub(value, "\n", "$\n")
-	value = string.gsub(value, " ", "$ ")
+	value = value:gsub("%$", "$$") -- TODO maybe there is better way
+	value = value:gsub(":", "$:")
+	value = value:gsub("\n", "$\n")
+	value = value:gsub(" ", "$ ")
+	return value
+end
+
+-- in some cases we write file names in rule commands directly
+-- so we need to propely escape them
+function ninja.shesc(value)
+	if type(value) == "table" then
+		local result = {}
+		local n = #value
+		for i = 1, n do
+			table.insert(result, ninja.shesc(value[i]))
+		end
+		return result
+	end
+
+	if value:find(" ") then
+		return "\"" .. value .. "\""
+	end
+
 	return value
 end
 
@@ -176,7 +195,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " $in " .. ninja.list(toolset.getlinks(cfg)) .. " /link " .. all_ldflags .. " /nologo /out:$out")
+		p.w("  command = " .. link .. " $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "clang" then
@@ -197,7 +216,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(toolset.getlinks(cfg)) .. " -o $out $in")
+		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " -o $out $in")
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "gcc" then
@@ -218,7 +237,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(toolset.getlinks(cfg)) .. " -o $out $in")
+		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " -o $out $in")
 		p.w("  description = link $out")
 		p.w("")
 	end
