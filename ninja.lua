@@ -65,21 +65,24 @@ end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
-	if cfg.toolset == nil then -- TODO why premake doesn't provide default name always ?
-		if cfg.system == "windows" then
-			cfg.toolset = "msc"
-		elseif cfg.system == "macosx" then
-			cfg.toolset = "clang"
-		elseif cfg.system == "linux" then
-			cfg.toolset = "gcc"
+	local toolset_name = _OPTIONS.cc or cfg.toolset
+	local system_name = os.get()
+
+	if toolset_name == nil then -- TODO why premake doesn't provide default name always ?
+		if system_name == "windows" then
+			toolset_name = "msc"
+		elseif system_name == "macosx" then
+			toolset_name = "clang"
+		elseif system_name == "linux" then
+			toolset_name = "gcc"
 		else
-			cfg.toolset = "gcc"
-			p.warnOnce("unknown_system", "no toolchain set and unknown system " .. cfg.system .. " so assuming toolchain is gcc")
+			toolset_name = "gcc"
+			p.warnOnce("unknown_system", "no toolchain set and unknown system " .. system_name .. " so assuming toolchain is gcc")
 		end
 	end
 
 	local prj = cfg.project
-	local toolset = premake.tools[cfg.toolset]
+	local toolset = premake.tools[toolset_name]
 
 	p.w("# project build file")
 	p.w("# generated with premake ninja")
@@ -96,25 +99,25 @@ function ninja.generateProjectCfg(cfg)
 	local ar = ""
 	local link = ""
 	
-	if cfg.toolset == "msc" then
+	if toolset_name == "msc" then
 		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
 		cc = "cl"
 		cxx = "cl"
 		ar = "lib"
 		link = "cl"
-	elseif cfg.toolset == "clang" then
+	elseif toolset_name == "clang" then
 		cc = toolset:gettoolname("cc")
 		cxx = toolset:gettoolname("cxx")
 		ar = toolset:gettoolname("ar")
 		link = toolset:gettoolname("cc")
-	elseif cfg.toolset == "gcc" then
+	elseif toolset_name == "gcc" then
 		if not cfg.gccprefix then cfg.gccprefix = "" end
 		cc = toolset.gettoolname(cfg, "cc")
 		cxx = toolset.gettoolname(cfg, "cxx")
 		ar = toolset.gettoolname(cfg, "ar")
 		link = toolset.gettoolname(cfg, "cc")
 	else
-		p.error("unknown toolchain " .. cfg.toolset)
+		p.error("unknown toolchain " .. toolset_name)
 	end
 
 	---------------------------------------------------- figure out settings
@@ -129,19 +132,19 @@ function ninja.generateProjectCfg(cfg)
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 	local libs =			""
 
-	if cfg.toolset == "msc" then
+	if toolset_name == "msc" then
 		warnings = ninja.list(toolset.getwarnings(cfg))
 		-- we don't pass getlinks(cfg) through dependencies
 		-- because system libraries are often not in PATH so ninja can't find them
 		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
-	elseif cfg.toolset == "clang" then
+	elseif toolset_name == "clang" then
 		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
-	elseif cfg.toolset == "gcc" then
+	elseif toolset_name == "gcc" then
 		libs = ninja.list(premake.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	end
 
 	-- experimental feature, change install_name of shared libs
-	--if (cfg.toolset == "clang") and (cfg.kind == premake.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
+	--if (toolset_name == "clang") and (cfg.kind == premake.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
 
@@ -153,7 +156,7 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
-	if cfg.toolset == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
+	if toolset_name == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cc $out")
@@ -172,7 +175,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  command = " .. link .. " $in " .. ninja.list(toolset.getlinks(cfg)) .. " /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
-	elseif cfg.toolset == "clang" then
+	elseif toolset_name == "clang" then
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
@@ -193,7 +196,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(toolset.getlinks(cfg)) .. " -o $out $in")
 		p.w("  description = link $out")
 		p.w("")
-	elseif cfg.toolset == "gcc" then
+	elseif toolset_name == "gcc" then
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
@@ -220,7 +223,7 @@ function ninja.generateProjectCfg(cfg)
 	p.w("# build files")
 	local intermediateExt = function(cfg, var)
 		if (var == "c") or (var == "cxx") then
-			return iif(cfg.toolset == "msc", ".obj", ".o")
+			return iif(toolset_name == "msc", ".obj", ".o")
 		elseif var == "res" then
 			-- TODO
 			return ".res"
