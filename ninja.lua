@@ -17,15 +17,11 @@ premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
 function ninja.esc(value)
-	-- str = str.replace("$", "$$").replace(":", "$:").replace("\n", "$\n")
-
-	--print("'" .. value .. "'")
-	value = string.gsub(value, "%$", "$$")
+	value = string.gsub(value, "%$", "$$") -- TODO maybe there is better way
 	value = string.gsub(value, ":", "$:")
 	value = string.gsub(value, "\n", "$\n")
 	value = string.gsub(value, " ", "$ ")
-	--print("'" .. value .. "'")
-	return value -- TODO
+	return value
 end
 
 -- generate solution that will call ninja for projects
