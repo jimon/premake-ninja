@@ -10,8 +10,10 @@ before_install:
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
   - unzip v5.0.0-alpha5.zip
   - unzip ninja-linux.zip
+  - cd premake-core-5.0.0-alpha5
   - make -f Bootstrap.mak $TRAVIS_OS_NAME
-  - cp bin/release/premake5 premak5
+  - cp bin/release/premake5 ../premak5
+  - cd ..
   - chmod +x premake5
   - chmod +x ninja
   - ls -al
