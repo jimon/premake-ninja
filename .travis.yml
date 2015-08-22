@@ -9,6 +9,8 @@ before_script:
   - tar -xzvf premake-5.0.0-alpha5-macosx.tar.gz
   - unzip ninja-mac.zip
   - export PATH=$(pwd):$PATH
+  - premake5 --help
+  - ninja --help
 script:
   - cd tests
   - python3 run_tests.py
