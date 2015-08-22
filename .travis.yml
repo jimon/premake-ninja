@@ -8,11 +8,12 @@ before_script:
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-mac.zip
   - tar -xzvf premake-5.0.0-alpha5-macosx.tar.gz
   - unzip ninja-mac.zip
-  - export PATH=$(pwd):$PATH
   - chmod -x premake5
   - chmod -x ninja
-  - premake5 --help
-  - ninja --help
+  - ls -al
+  - export PATH=$(pwd):$PATH
+  - ./premake5 --help
+  - ./ninja --help
 script:
   - cd tests
   - python3 run_tests.py
