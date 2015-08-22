@@ -8,8 +8,8 @@ before_script:
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-mac.zip
   - tar -xzvf premake-5.0.0-alpha5-macosx.tar.gz
   - unzip ninja-mac.zip
-  - chmod +x premake5
-  - chmod +x ninja
+  - chmod 777 premake5
+  - chmod 777 ninja
   - ls -al
   - export PATH=$(pwd):$PATH
   - ./premake5 --help
