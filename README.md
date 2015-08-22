@@ -1,6 +1,6 @@
 # premake-ninja
 
-Premake extension to support Ninja, because it's awesome.
+[Premake](https://github.com/premake/premake-core) extension to support [Ninja](https://github.com/martine/ninja), because it's awesome.
 
 ### Implementation
 
@@ -15,7 +15,9 @@ Build.ninja file sets phony targets for configuration names so you can build the
 - Custom build rules are not supported 
 - Makefile not supported
 - Bundles of any sort are not supported
-- Clear methods are not supported 
+- Clear methods are not supported
+- C# not supported 
+- D not supported
 
 ### Tested on
 
