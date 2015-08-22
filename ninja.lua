@@ -63,7 +63,7 @@ function ninja.generateSolution(sln)
 			if cfg_first == nil then cfg_first = cfg.name end
 
 			-- include other ninja file
-			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg)))
+			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg, true)))
 		end
 	end
 	p.w("")
@@ -144,26 +144,34 @@ function ninja.generateProjectCfg(cfg)
 	end
 
 	---------------------------------------------------- figure out settings
+	globalincludes = {}
+	table.foreachi(cfg.includedirs, function(v)
+		-- TODO this is a bit obscure and currently I have no idea why exactly it's working
+		globalincludes[#globalincludes + 1] = project.getrelative(cfg.workspace, v)
+	end)
+
 	local buildopt =		ninja.list(cfg.buildoptions)
 	local cflags =			ninja.list(toolset.getcflags(cfg))
 	local cppflags =		ninja.list(toolset.getcppflags(cfg))
 	local cxxflags =		ninja.list(toolset.getcxxflags(cfg))
 	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes =		ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
+	local includes =		ninja.list(toolset.getincludedirs(cfg, globalincludes, cfg.sysincludedirs))
 	local forceincludes =	ninja.list(toolset.getforceincludes(cfg)) -- TODO pch
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 	local libs =			""
 
 	if toolset_name == "msc" then
 		warnings = ninja.list(toolset.getwarnings(cfg))
-		-- we don't pass getlinks(cfg) through dependencies
-		-- because system libraries are often not in PATH so ninja can't find them
-		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
-	elseif toolset_name == "clang" then
-		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
-	elseif toolset_name == "gcc" then
-		libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
+	end
+
+	-- we don't pass getlinks(cfg) through dependencies
+	-- because system libraries are often not in PATH so ninja can't find them
+	libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
+
+	if toolset_name == "msc" then
+		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
+		ldflags = ldflags .. " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
 	end
 
 	-- experimental feature, change install_name of shared libs
@@ -175,7 +183,7 @@ function ninja.generateProjectCfg(cfg)
 	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
 	local all_ldflags = buildopt .. ldflags
 
-	local obj_dir = project.getrelative(cfg.project, cfg.objdir)
+	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
@@ -263,10 +271,11 @@ function ninja.generateProjectCfg(cfg)
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
-			if ninja.endsWith(node.relpath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath))
+			srcpath = project.getrelative(cfg.workspace, cfg.location .. "/" .. node.relpath)
+			if ninja.endsWith(srcpath, ".c") then
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(srcpath))
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath))
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(srcpath))
 			end
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
@@ -311,12 +320,17 @@ end
 
 -- return name of output binary relative to build folder
 function ninja.outputFilename(cfg)
-	return project.getrelative(cfg.project, cfg.buildtarget.directory) .. "/" .. cfg.buildtarget.name
+	return project.getrelative(cfg.workspace, cfg.buildtarget.directory) .. "/" .. cfg.buildtarget.name
 end
 
 -- return name of build file for configuration
-function ninja.projectCfgFilename(cfg)
-	return "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
+function ninja.projectCfgFilename(cfg, relative)
+	if relative ~= nil then
+		relative = project.getrelative(cfg.workspace, cfg.location) .. "/"
+	else
+		relative = ""
+	end
+	return relative .. "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
 end
 
 -- check if string starts with string
