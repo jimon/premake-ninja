@@ -163,16 +163,14 @@ function ninja.generateProjectCfg(cfg)
 
 	if toolset_name == "msc" then
 		warnings = ninja.list(toolset.getwarnings(cfg))
+
+		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
+		default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
 	end
 
 	-- we don't pass getlinks(cfg) through dependencies
 	-- because system libraries are often not in PATH so ninja can't find them
 	libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
-
-	if toolset_name == "msc" then
-		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
-		ldflags = ldflags .. " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
-	end
 
 	-- experimental feature, change install_name of shared libs
 	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
@@ -203,7 +201,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " /link " .. all_ldflags .. " /nologo /out:$out")
+		p.w("  command = " .. link .. " $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. default_msvc_libs .. " /link " .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "clang" then
@@ -224,7 +222,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " -o $out $in")
+		p.w("  command = " .. link .. " -o $out $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg, "system"))) .. " " .. all_ldflags)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "gcc" then
@@ -245,7 +243,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. all_ldflags .. " " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. " -o $out $in")
+		p.w("  command = " .. link .. " -o $out $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg, "system"))) .. " " .. all_ldflags)
 		p.w("  description = link $out")
 		p.w("")
 	end
