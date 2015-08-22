@@ -2,12 +2,12 @@ language: python
 python:
   - "3.4"
 os:
-  - linux
+  - osx
 before_script:
-  - wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha5/premake-5.0.0-alpha5-linux.tar.gz
-  - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
-  - tar -xzvf premake-5.0.0-alpha5-linux.tar.gz
-  - unzip ninja-linux.zip
+  - wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha5/premake-5.0.0-alpha5-macosx.tar.gz
+  - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-mac.zip
+  - tar -xzvf premake-5.0.0-alpha5-macosx.tar.gz
+  - unzip ninja-mac.zip
   - export PATH=$(pwd):$PATH
 script:
   - cd tests
