@@ -8,6 +8,7 @@ before_script:
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
   - tar -xzvf premake-5.0.0-alpha5-linux.tar.gz
   - unzip ninja-linux.zip
+  - export PATH=$(pwd):$PATH
 script:
   - cd tests
   - python3 run_tests.py
