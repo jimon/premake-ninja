@@ -1,6 +1,10 @@
+language: python
+python:
+  - "3.2"
+  - "3.3"
+  - "3.4"
 os:
   - linux
-
 script:
   - cd tests
   - python3 run_tests.py
