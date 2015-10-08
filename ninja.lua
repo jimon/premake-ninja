@@ -51,16 +51,19 @@ function ninja.generateSolution(sln)
 
 	p.w("# build projects")
 	local cfgs = {} -- key is configuration name, value is string of outputs names
+	local key = ""
 	local cfg_first = nil
 	for prj in solution.eachproject(sln) do
 		for cfg in project.eachconfig(prj) do
 
+			key = cfg.buildcfg .. "_" .. cfg.platform
+			
 			-- fill list of output files
-			if not cfgs[cfg.name] then cfgs[cfg.name] = "" end
-			cfgs[cfg.name] = cfgs[cfg.name] .. p.esc(ninja.outputFilename(cfg)) .. " "
+			if not cfgs[key] then cfgs[key] = "" end
+			cfgs[key] = p.esc(ninja.outputFilename(cfg)) .. " "
 
 			-- set first configuration name
-			if cfg_first == nil then cfg_first = cfg.name end
+			if cfg_first == nil then cfg_first = key end
 
 			-- include other ninja file
 			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg, true)))
@@ -76,6 +79,8 @@ function ninja.generateSolution(sln)
 
 	p.w("# default target")
 	p.w("default " .. cfg_first)
+	
+	p.w("")
 end
 
 function ninja.list(value)
@@ -314,6 +319,8 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
+	
+	p.w("")
 end
 
 -- return name of output binary relative to build folder
@@ -328,7 +335,7 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	return relative .. "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
+	return relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg .. "_" .. cfg.platform .. ".ninja"
 end
 
 -- check if string starts with string
