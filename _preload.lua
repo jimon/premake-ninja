@@ -19,7 +19,7 @@ newaction
 	module			= "ninja",
 
 	-- The capabilities of this action
-	valid_kinds		= {"ConsoleAp", "WindowedApp", "Makefile", "SharedLib", "StaticLib"}, -- TODO do we need MakeFile ?
+	valid_kinds		= {"ConsoleApp", "WindowedApp", "Makefile", "SharedLib", "StaticLib"}, -- TODO do we need MakeFile ?
 	valid_languages	= {"C", "C++"},
 	valid_tools		= {cc = { "gcc", "clang", "msc" }},
 
