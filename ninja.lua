@@ -58,7 +58,9 @@ function ninja.generateSolution(sln)
 	for prj in solution.eachproject(sln) do
 		for cfg in project.eachconfig(prj) do
 
-			key = prj.name .. "_" .. cfg.buildcfg .. "_" .. cfg.platform
+			key = prj.name .. "_" .. cfg.buildcfg
+			
+			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 			
 			-- fill list of output files
 			if not cfgs[key] then cfgs[key] = "" end
@@ -285,11 +287,10 @@ function ninja.generateProjectCfg(cfg)
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
-			srcpath = project.getrelative(cfg.workspace, "/" .. node.relpath)
-			if ninja.endsWith(srcpath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(srcpath))
+			if ninja.endsWith(node.abspath, ".c") then
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath))
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(srcpath))
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath))
 			end
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
@@ -346,7 +347,12 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	return relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg .. "_" .. cfg.platform .. ".ninja"
+	
+	local ninjapath = relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg
+	
+	if cfg.platform ~= nil then ninjapath = ninjapath .. "_" .. cfg.platform end
+	
+	return ninjapath .. ".ninja"
 end
 
 -- check if string starts with string
