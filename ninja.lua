@@ -50,32 +50,50 @@ function ninja.generateSolution(sln)
 	p.w("")
 
 	p.w("# build projects")
-	local cfgs = {} -- key is configuration name, value is string of outputs names
+	local cfgs = {} -- key is concatanated name or variant name, value is string of outputs names
+	local key = ""
 	local cfg_first = nil
+	local cfg_first_lib = nil
+
 	for prj in solution.eachproject(sln) do
 		for cfg in project.eachconfig(prj) do
+			key = prj.name .. "_" .. cfg.buildcfg
+
+			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 
 			-- fill list of output files
-			if not cfgs[cfg.name] then cfgs[cfg.name] = "" end
-			cfgs[cfg.name] = cfgs[cfg.name] .. p.esc(ninja.outputFilename(cfg)) .. " "
+			if not cfgs[key] then cfgs[key] = "" end
+			cfgs[key] = p.esc(ninja.outputFilename(cfg)) .. " "
+
+			if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
+			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. p.esc(ninja.outputFilename(cfg)) .. " "
 
 			-- set first configuration name
-			if cfg_first == nil then cfg_first = cfg.name end
+			if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
+				cfg_first = key
+			end
+			if (cfg_first_lib == nil) and (cfg.kind == p.STATICLIB or cfg.kind == p.SHAREDLIB) then
+				cfg_first_lib = key
+			end
 
 			-- include other ninja file
 			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg, true)))
 		end
 	end
+
+	if cfg_first == nil then cfg_first = cfg_first_lib end
+
 	p.w("")
 
 	p.w("# targets")
 	for cfg, outputs in pairs(cfgs) do
-		p.w("build " .. cfg .. ": phony " .. outputs)
+		p.w("build " .. p.esc(cfg) .. ": phony " .. outputs)
 	end
 	p.w("")
 
 	p.w("# default target")
-	p.w("default " .. cfg_first)
+	p.w("default " .. p.esc(cfg_first))
+	p.w("")
 end
 
 function ninja.list(value)
@@ -269,11 +287,10 @@ function ninja.generateProjectCfg(cfg)
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
-			srcpath = project.getrelative(cfg.workspace, cfg.location .. "/" .. node.relpath)
-			if ninja.endsWith(srcpath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(srcpath))
+			if ninja.endsWith(node.abspath, ".c") then
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath))
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(srcpath))
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath))
 			end
 		elseif path.isresourcefile(node.abspath) then
 			-- TODO
@@ -314,6 +331,8 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
+
+	p.w("")
 end
 
 -- return name of output binary relative to build folder
@@ -328,7 +347,12 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	return relative .. "build_" .. cfg.project.name  .. "_" .. cfg.name .. ".ninja"
+	
+	local ninjapath = relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg
+	
+	if cfg.platform ~= nil then ninjapath = ninjapath .. "_" .. cfg.platform end
+	
+	return ninjapath .. ".ninja"
 end
 
 -- check if string starts with string
