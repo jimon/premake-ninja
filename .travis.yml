@@ -1,6 +1,4 @@
 language: cpp
-python:
-  - "3.4"
 os:
   - linux
   - osx

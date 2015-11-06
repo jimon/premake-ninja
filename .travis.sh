@@ -1,6 +1,8 @@
 #!/bin/bash
+
 mkdir .bins
 pushd .bins
+
 wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha6/premake-5.0.0-alpha6-src.zip
 unzip premake-5.0.0-alpha6-src.zip
 if [ "$TRAVIS_OS_NAME" == "linux" ]; then
@@ -13,7 +15,7 @@ elif [ "$TRAVIS_OS_NAME" == "osx" ]; then
   popd
 fi
 cp premake-5.0.0-alpha6/bin/release/premake5 premake5
-popd
+
 if [ "$TRAVIS_OS_NAME" == "linux" ]; then
   wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
   unzip ninja-linux.zip
@@ -21,12 +23,18 @@ elif [ "$TRAVIS_OS_NAME" == "osx" ]; then
   wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-mac.zip
   unzip ninja-mac.zip
 fi
+
 chmod +x premake5
 chmod +x ninja
 ls -al
 export PATH=$(pwd):$PATH
+
 popd
-if [ "$TRAVIS_OS_NAME" == "osx" ]; then
+
+if [ "$TRAVIS_OS_NAME" == "linux" ]; then
+  sudo apt-get update
+  sudo apt-get python3
+elif [ "$TRAVIS_OS_NAME" == "osx" ]; then
   brew update
   brew install python3
 fi
