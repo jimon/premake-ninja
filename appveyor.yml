@@ -16,6 +16,7 @@ install:
   - cd ..
 build: off
 test_script:
+  - call "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x86
   - cd tests
   - python run_tests.py
   - cd ..
