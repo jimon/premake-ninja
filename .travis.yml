@@ -1,9 +1,10 @@
 language: python
 python:
-  - "3.5"
+  - "3.4"
 os:
   - linux
 before_install:
+  - mkdir .bins
   - pushd .bins
   - wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha6/premake-5.0.0-alpha6-src.zip
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
