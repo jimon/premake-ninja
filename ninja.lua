@@ -76,6 +76,7 @@ function ninja.generateSolution(sln)
 
 	p.w("# default target")
 	p.w("default " .. cfg_first)
+	p.w("")
 end
 
 function ninja.list(value)
@@ -314,6 +315,8 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
+
+	p.w("")
 end
 
 -- return name of output binary relative to build folder
