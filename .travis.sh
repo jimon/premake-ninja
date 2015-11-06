@@ -25,11 +25,8 @@ chmod +x premake5
 chmod +x ninja
 ls -al
 export PATH=$(pwd):$PATH
-./premake5 --version
-./ninja --version
 popd
 if [ "$TRAVIS_OS_NAME" == "osx" ]; then
   brew update
   brew install python3
-  python3 --version
 fi

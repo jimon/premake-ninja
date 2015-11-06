@@ -1,9 +1,14 @@
 language: cpp
+python:
+  - "3.4"
 os:
   - linux
   - osx
 before_install:
   - bash .travis.sh
+  - python3 --version
+  - premake5 --version
+  - ninja --version
 script:
   - pushd tests
   - python3 run_tests.py
