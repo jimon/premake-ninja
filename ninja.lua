@@ -150,7 +150,7 @@ function ninja.generateProjectCfg(cfg)
 		cc = toolset:gettoolname("cc")
 		cxx = toolset:gettoolname("cxx")
 		ar = toolset:gettoolname("ar")
-		link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
+		link = toolset:gettoolname(iif(cfg.language == "C", "cc", "cxx"))
 	elseif toolset_name == "gcc" then
 		if not cfg.gccprefix then cfg.gccprefix = "" end
 		cc = toolset.gettoolname(cfg, "cc")
