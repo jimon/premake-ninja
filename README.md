@@ -1,6 +1,6 @@
 # premake-ninja
 
-[Premake](https://github.com/premake/premake-core) extension to support [Ninja](https://github.com/martine/ninja), because it's awesome. [![Build Status](https://travis-ci.org/jimon/premake-ninja.svg?branch=master)](https://travis-ci.org/jimon/premake-ninja)
+[Premake](https://github.com/premake/premake-core) extension to support [Ninja](https://github.com/martine/ninja), because it's awesome. [![Build Status](https://travis-ci.org/jimon/premake-ninja.svg?branch=master)](https://travis-ci.org/jimon/premake-ninja) [![Build status](https://ci.appveyor.com/api/projects/status/3d2vot6y72nfo24y/branch/master?svg=true)](https://ci.appveyor.com/project/jimon/premake-ninja/branch/master)
 
 ### Implementation
 
