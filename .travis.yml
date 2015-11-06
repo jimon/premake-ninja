@@ -4,23 +4,24 @@ python:
 os:
   - linux
 before_install:
-  - mkdir .bins
-  - cd .bins
+  - pushd .bins
   - wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha6/premake-5.0.0-alpha6-src.zip
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
   - unzip premake-5.0.0-alpha6-src.zip
   - unzip ninja-linux.zip
-  - cd premake-5.0.0-alpha6
-  - make -f Bootstrap.mak $TRAVIS_OS_NAME
+  - pushd premake-5.0.0-alpha6
+  - pushd build/gmake.unix/
+  - make
+  - popd
   - cp bin/release/premake5 ../premake5
-  - cd ..
+  - popd
   - chmod +x premake5
   - chmod +x ninja
   - ls -al
   - export PATH=$(pwd):$PATH
   - ./premake5 --help
   - ./ninja --help
-  - cd ..
+  - popd
 script:
-  - cd tests
+  - pushd tests
   - python3 run_tests.py
