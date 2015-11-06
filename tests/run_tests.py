@@ -14,6 +14,48 @@ current_cwd = os.getcwd()
 # if set, will override compiler name when premake is executed
 override_compiler = None
 
+# finds the file in path
+def which(cmd, mode = os.F_OK | os.X_OK, path = None):
+	if sys.version_info[0:2] >= (3, 3):
+		return shutil.which(cmd, mode, path)
+	else:
+		def _access_check(fn, mode):
+			return (os.path.exists(fn) and os.access(fn, mode)
+					and not os.path.isdir(fn))
+
+		if os.path.dirname(cmd):
+			if _access_check(cmd, mode):
+				return cmd
+			return None
+
+		if path is None:
+			path = os.environ.get("PATH", os.defpath)
+		if not path:
+			return None
+		path = path.split(os.pathsep)
+
+		if sys.platform == "win32":
+			if not os.curdir in path:
+				path.insert(0, os.curdir)
+			pathext = os.environ.get("PATHEXT", "").split(os.pathsep)
+			if any(cmd.lower().endswith(ext.lower()) for ext in pathext):
+				files = [cmd]
+			else:
+				files = [cmd + ext for ext in pathext]
+		else:
+			files = [cmd]
+
+		seen = set()
+		for dir in path:
+			normdir = os.path.normcase(dir)
+			if not normdir in seen:
+				seen.add(normdir)
+				for thefile in files:
+					name = os.path.join(dir, thefile)
+					if _access_check(name, mode):
+						return name
+		return None
+
 # ----------------------------------------------------- helper class
 class Helper(unittest.TestCase):
 	# removes build directory in test folder
@@ -197,7 +239,7 @@ if __name__ == "__main__":
 	if not r.result.wasSuccessful():
 		sys.exit(1)
 
-	if platform.system() == "Windows" and shutil.which("gcc"):
+	if platform.system() == "Windows" and which("gcc"):
 		print("-------------------------- found gcc on windows")
 		override_compiler = "gcc"
 		unittest.main()

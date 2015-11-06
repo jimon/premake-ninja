@@ -1,15 +1,14 @@
 language: cpp
-sudo: true
 os:
   - linux
   - osx
 before_install:
   - bash .travis.sh
   - export PATH=$(pwd)/.bins:$PATH
-  - python3 --version
+  - python --version
   - premake5 --version
   - ninja --version
 script:
   - pushd tests
-  - python3 run_tests.py
+  - python run_tests.py
   - popd
