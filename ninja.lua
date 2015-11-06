@@ -50,29 +50,30 @@ function ninja.generateSolution(sln)
 	p.w("")
 
 	p.w("# build projects")
-	local cfgs = {} -- key is configuration name, value is string of outputs names
+	local cfgs = {} -- key is concatanated name or variant name, value is string of outputs names
 	local key = ""
 	local cfg_first = nil
 	local cfg_first_lib = nil
 
 	for prj in solution.eachproject(sln) do
 		for cfg in project.eachconfig(prj) do
-
 			key = prj.name .. "_" .. cfg.buildcfg
-			
+
 			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
-			
+
 			-- fill list of output files
 			if not cfgs[key] then cfgs[key] = "" end
 			cfgs[key] = p.esc(ninja.outputFilename(cfg)) .. " "
 
+			if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
+			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. p.esc(ninja.outputFilename(cfg)) .. " "
+
 			-- set first configuration name
-			if cfg_first == nil then
-				if cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP then
-					cfg_first = key
-				else
-					cfg_first_lib = key
-				end
+			if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
+				cfg_first = key
+			end
+			if (cfg_first_lib == nil) and (cfg.kind == p.STATICLIB or cfg.kind == p.SHAREDLIB) then
+				cfg_first_lib = key
 			end
 
 			-- include other ninja file
@@ -86,12 +87,12 @@ function ninja.generateSolution(sln)
 
 	p.w("# targets")
 	for cfg, outputs in pairs(cfgs) do
-		p.w("build " .. cfg .. ": phony " .. outputs)
+		p.w("build " .. p.esc(cfg) .. ": phony " .. outputs)
 	end
 	p.w("")
 
 	p.w("# default target")
-	p.w("default " .. cfg_first)
+	p.w("default " .. p.esc(cfg_first))
 	p.w("")
 end
 
