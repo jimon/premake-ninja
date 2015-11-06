@@ -1,18 +1,18 @@
 language: python
 python:
-  - "3.4"
+  - "3.5"
 os:
   - linux
 before_install:
   - mkdir .bins
   - cd .bins
-  - wget https://github.com/premake/premake-core/archive/v5.0.0-alpha5.zip
+  - wget https://github.com/premake/premake-core/releases/download/v5.0.0-alpha6/premake-5.0.0-alpha6-src.zip
   - wget https://github.com/martine/ninja/releases/download/v1.6.0/ninja-linux.zip
-  - unzip v5.0.0-alpha5.zip
+  - unzip premake-5.0.0-alpha6-src.zip
   - unzip ninja-linux.zip
-  - cd premake-core-5.0.0-alpha5
+  - cd premake-5.0.0-alpha6
   - make -f Bootstrap.mak $TRAVIS_OS_NAME
-  - cp bin/release/premake5 ../premak5
+  - cp bin/release/premake5 ../premake5
   - cd ..
   - chmod +x premake5
   - chmod +x ninja
