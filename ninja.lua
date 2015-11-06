@@ -150,13 +150,13 @@ function ninja.generateProjectCfg(cfg)
 		cc = toolset:gettoolname("cc")
 		cxx = toolset:gettoolname("cxx")
 		ar = toolset:gettoolname("ar")
-		link = toolset:gettoolname("cc")
+		link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	elseif toolset_name == "gcc" then
 		if not cfg.gccprefix then cfg.gccprefix = "" end
 		cc = toolset.gettoolname(cfg, "cc")
 		cxx = toolset.gettoolname(cfg, "cxx")
 		ar = toolset.gettoolname(cfg, "ar")
-		link = toolset.gettoolname(cfg, "cc")
+		link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	else
 		p.error("unknown toolchain " .. toolset_name)
 	end
