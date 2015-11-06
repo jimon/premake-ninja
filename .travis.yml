@@ -20,9 +20,10 @@ before_install:
   - chmod +x ninja
   - ls -al
   - export PATH=$(pwd):$PATH
-  - ./premake5 --help
-  - ./ninja --help
+  - ./premake5 --version
+  - ./ninja --version
   - popd
 script:
   - pushd tests
   - python3 run_tests.py
+  - popd
