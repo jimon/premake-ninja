@@ -139,6 +139,7 @@ function ninja.generateProjectCfg(cfg)
 	local cxx = ""
 	local ar = ""
 	local link = ""
+	local rc = ""
 	
 	if toolset_name == "msc" then
 		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
@@ -146,6 +147,7 @@ function ninja.generateProjectCfg(cfg)
 		cxx = "cl"
 		ar = "lib"
 		link = "cl"
+		rc = "rc"
 	elseif toolset_name == "clang" then
 		cc = toolset:gettoolname("cc")
 		cxx = toolset:gettoolname("cxx")
@@ -217,6 +219,10 @@ function ninja.generateProjectCfg(cfg)
 		p.w("rule ar")
 		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
 		p.w("  description = ar $out")
+		p.w("")
+		p.w("rule rc")
+		p.w("  command = " .. rc .. " /nologo /fo$out $in")
+		p.w("  description = rc $out")
 		p.w("")
 		p.w("rule link")
 		p.w("  command = " .. link .. " $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. default_msvc_libs .. " /link " .. all_ldflags .. " /nologo /out:$out")
@@ -293,7 +299,9 @@ function ninja.generateProjectCfg(cfg)
 				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath))
 			end
 		elseif path.isresourcefile(node.abspath) then
-			-- TODO
+			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
+			objfiles[#objfiles + 1] = objfilename
+			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.abspath))
 		end
 	end,
 	}, false, 1)
