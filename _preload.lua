@@ -16,7 +16,6 @@
 		trigger			= "ninja",
 		shortname		= "ninja",
 		description		= "Ninja is a small build system with a focus on speed",
-		module			= "ninja",
 
 		-- The capabilities of this action
 		valid_kinds		= {"ConsoleApp", "WindowedApp", "Makefile", "SharedLib", "StaticLib"}, -- TODO do we need MakeFile ?
