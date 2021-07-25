@@ -61,12 +61,8 @@ function ninja.generateSolution(sln)
 
 			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 
-			-- fill list of output files
-			if not cfgs[key] then cfgs[key] = "" end
-			cfgs[key] = p.esc(ninja.outputFilename(cfg)) .. " "
-
 			if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
-			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. p.esc(ninja.outputFilename(cfg)) .. " "
+			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. key .. " "
 
 			-- set first configuration name
 			if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
@@ -106,6 +102,9 @@ end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
+	local prj = cfg.project
+	local key = prj.name .. "_" .. cfg.buildcfg
+
 	local toolset_name = _OPTIONS.cc or cfg.toolset
 	local system_name = os.target()
 
@@ -206,6 +205,38 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		local commands = {}
+		if cfg.prebuildmessage then
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prebuildmessage, cfg.project.basedir, cfg.project.location)}
+		end
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.project.basedir, cfg.project.location))
+		if (#commands > 1) then
+			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+		else
+			commands = commands[1]
+		end
+		p.w("rule run_prebuild")
+		p.w("  command = " .. p.esc(commands))
+		p.w("  description = prebuild")
+		p.w("")
+	end
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		local commands = {}
+		if cfg.postbuildmessage then
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.postbuildmessage, cfg.project.basedir, cfg.project.location)}
+		end
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.project.basedir, cfg.project.location))
+		if (#commands > 1) then
+			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+		else
+			commands = commands[1]
+		end
+		p.w("rule run_postbuild")
+		p.w("  command = " .. p.esc(commands))
+		p.w("  description = postbuild")
+		p.w("")
+	end
 	if toolset_name == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
@@ -332,14 +363,25 @@ function ninja.generateProjectCfg(cfg)
 	p.w("")
 
 	---------------------------------------------------- build final target
+	local prebuild_dependency = ""
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		prebuild_dependency = " || prebuild"
+		p.w("# prebuild")
+		p.w("build prebuild: run_prebuild")
+	end
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		p.w("# postbuild")
+		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
+	end
+
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
 		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
@@ -358,12 +400,18 @@ function ninja.generateProjectCfg(cfg)
 
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
 
+	p.w("")
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		p.w("build " .. key .. ": phony postbuild")
+	else
+		p.w("build " .. key .. ": phony " .. ninja.outputFilename(cfg))
+	end
 	p.w("")
 end
 
