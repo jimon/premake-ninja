@@ -140,7 +140,7 @@ function ninja.generateProjectCfg(cfg)
 	local ar = ""
 	local link = ""
 	local rc = ""
-	
+
 	if toolset_name == "msc" then
 		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
 		cc = "cl"
@@ -177,7 +177,8 @@ function ninja.generateProjectCfg(cfg)
 	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes =		ninja.list(toolset.getincludedirs(cfg, globalincludes, cfg.sysincludedirs))
-	local forceincludes =	ninja.list(toolset.getforceincludes(cfg)) -- TODO pch
+	local forceincludes =	ninja.list(toolset.getforceincludes(cfg))
+	local pch = p.tools.gcc.getpch(cfg)
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 	local libs =			""
 
@@ -229,14 +230,23 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "clang" then
+		local force_include_pch = ""
+		if pch then
+			force_include_pch = " -include " .. p.esc(pch)
+			p.w("rule build_pch")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  description = build_pch $out")
+			p.w("  depfile = $out.d")
+			p.w("  deps = gcc")
+		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -250,14 +260,23 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "gcc" then
+		local force_include_pch = ""
+		if pch then
+			force_include_pch = " -include " .. p.esc(pch)
+			p.w("rule build_pch")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  description = build_pch $out")
+			p.w("  depfile = $out.d")
+			p.w("  deps = gcc")
+		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -284,6 +303,11 @@ function ninja.generateProjectCfg(cfg)
 			return cfg.targetextension
 		end
 	end
+	local pch_dependency = ""
+	if pch and toolset_name ~= "msc" then
+		pch_dependency = " | " .. pch .. ".gch"
+		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
+	end
 	local objfiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
@@ -294,9 +318,9 @@ function ninja.generateProjectCfg(cfg)
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath))
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath) .. pch_dependency)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath))
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath) .. pch_dependency)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
@@ -355,11 +379,11 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	
+
 	local ninjapath = relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg
-	
+
 	if cfg.platform ~= nil then ninjapath = ninjapath .. "_" .. cfg.platform end
-	
+
 	return ninjapath .. ".ninja"
 end
 
