@@ -107,7 +107,7 @@ end
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
 	local toolset_name = _OPTIONS.cc or cfg.toolset
-	local system_name = os.get()
+	local system_name = os.target()
 
 	if toolset_name == nil then -- TODO why premake doesn't provide default name always ?
 		if system_name == "windows" then
