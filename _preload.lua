@@ -22,6 +22,8 @@
 		valid_languages	= {"C", "C++"},
 		valid_tools		= {cc = { "gcc", "clang", "msc" }},
 
+		toolset = "gcc",
+
 		-- Solution and project generation logic
 		onSolution = function(sln)
 			p.eol("\r\n")
