@@ -316,6 +316,10 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	end
+	p.w("rule custom_command")
+	p.w("  command = $CUSTOM_COMMAND")
+	p.w("  description = $CUSTOM_DESCRIPTION")
+	p.w("")
 
 	---------------------------------------------------- build all files
 	p.w("# build files")
@@ -339,7 +343,26 @@ function ninja.generateProjectCfg(cfg)
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			-- TODO
+			local output = filecfg.buildOutputs[1]
+			local inputs = ""
+			if #filecfg.buildInputs > 0 then
+				inputs = table.implode(filecfg.buildInputs," ","","")
+			end
+
+			local commands = {}
+			if filecfg.buildmessage then
+				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, filecfg.project.basedir, filecfg.project.location)}
+			end
+			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildCommands, filecfg.project.basedir, filecfg.project.location))
+			if (#commands > 1) then
+				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+			else
+				commands = commands[1]
+			end
+
+			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.abspath) .. inputs)
+			p.w("  CUSTOM_COMMAND = " .. commands)
+			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
