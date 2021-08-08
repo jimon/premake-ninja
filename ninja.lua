@@ -45,6 +45,9 @@ end
 
 -- generate solution that will call ninja for projects
 function ninja.generateSolution(sln)
+	local oldGetDefaultSeparator = path.getDefaultSeparator
+	path.getDefaultSeparator = function() return "/" end
+
 	p.w("# solution build file")
 	p.w("# generated with premake ninja")
 	p.w("")
@@ -90,6 +93,8 @@ function ninja.generateSolution(sln)
 	p.w("# default target")
 	p.w("default " .. p.esc(cfg_first))
 	p.w("")
+
+	path.getDefaultSeparator = oldGetDefaultSeparator
 end
 
 function ninja.list(value)
