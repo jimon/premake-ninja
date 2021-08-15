@@ -45,6 +45,9 @@ end
 
 -- generate solution that will call ninja for projects
 function ninja.generateSolution(sln)
+	local oldGetDefaultSeparator = path.getDefaultSeparator
+	path.getDefaultSeparator = function() return "/" end
+
 	p.w("# solution build file")
 	p.w("# generated with premake ninja")
 	p.w("")
@@ -61,12 +64,8 @@ function ninja.generateSolution(sln)
 
 			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 
-			-- fill list of output files
-			if not cfgs[key] then cfgs[key] = "" end
-			cfgs[key] = p.esc(ninja.outputFilename(cfg)) .. " "
-
 			if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
-			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. p.esc(ninja.outputFilename(cfg)) .. " "
+			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. key .. " "
 
 			-- set first configuration name
 			if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
@@ -94,6 +93,8 @@ function ninja.generateSolution(sln)
 	p.w("# default target")
 	p.w("default " .. p.esc(cfg_first))
 	p.w("")
+
+	path.getDefaultSeparator = oldGetDefaultSeparator
 end
 
 function ninja.list(value)
@@ -106,8 +107,11 @@ end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
+	local prj = cfg.project
+	local key = prj.name .. "_" .. cfg.buildcfg
+
 	local toolset_name = _OPTIONS.cc or cfg.toolset
-	local system_name = os.get()
+	local system_name = os.target()
 
 	if toolset_name == nil then -- TODO why premake doesn't provide default name always ?
 		if system_name == "windows" then
@@ -140,7 +144,7 @@ function ninja.generateProjectCfg(cfg)
 	local ar = ""
 	local link = ""
 	local rc = ""
-	
+
 	if toolset_name == "msc" then
 		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
 		cc = "cl"
@@ -148,12 +152,7 @@ function ninja.generateProjectCfg(cfg)
 		ar = "lib"
 		link = "cl"
 		rc = "rc"
-	elseif toolset_name == "clang" then
-		cc = toolset:gettoolname("cc")
-		cxx = toolset:gettoolname("cxx")
-		ar = toolset:gettoolname("ar")
-		link = toolset:gettoolname(iif(cfg.language == "C", "cc", "cxx"))
-	elseif toolset_name == "gcc" then
+	elseif toolset_name == "clang" or toolset_name == "gcc" then
 		if not cfg.gccprefix then cfg.gccprefix = "" end
 		cc = toolset.gettoolname(cfg, "cc")
 		cxx = toolset.gettoolname(cfg, "cxx")
@@ -177,7 +176,8 @@ function ninja.generateProjectCfg(cfg)
 	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes =		ninja.list(toolset.getincludedirs(cfg, globalincludes, cfg.sysincludedirs))
-	local forceincludes =	ninja.list(toolset.getforceincludes(cfg)) -- TODO pch
+	local forceincludes =	ninja.list(toolset.getforceincludes(cfg))
+	local pch = p.tools.gcc.getpch(cfg)
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 	local libs =			""
 
@@ -199,12 +199,44 @@ function ninja.generateProjectCfg(cfg)
 
 	local all_cflags = buildopt .. cflags .. warnings .. defines .. includes .. forceincludes
 	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
-	local all_ldflags = buildopt .. ldflags
+	local all_ldflags = ldflags
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		local commands = {}
+		if cfg.prebuildmessage then
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prebuildmessage, cfg.project.basedir, cfg.project.location)}
+		end
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.project.basedir, cfg.project.location))
+		if (#commands > 1) then
+			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+		else
+			commands = commands[1]
+		end
+		p.w("rule run_prebuild")
+		p.w("  command = " .. p.esc(commands))
+		p.w("  description = prebuild")
+		p.w("")
+	end
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		local commands = {}
+		if cfg.postbuildmessage then
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.postbuildmessage, cfg.project.basedir, cfg.project.location)}
+		end
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.project.basedir, cfg.project.location))
+		if (#commands > 1) then
+			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+		else
+			commands = commands[1]
+		end
+		p.w("rule run_postbuild")
+		p.w("  command = " .. p.esc(commands))
+		p.w("  description = postbuild")
+		p.w("")
+	end
 	if toolset_name == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
@@ -229,14 +261,23 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "clang" then
+		local force_include_pch = ""
+		if pch then
+			force_include_pch = " -include " .. p.esc(pch)
+			p.w("rule build_pch")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  description = build_pch $out")
+			p.w("  depfile = $out.d")
+			p.w("  deps = gcc")
+		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -250,14 +291,23 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "gcc" then
+		local force_include_pch = ""
+		if pch then
+			force_include_pch = " -include " .. p.esc(pch)
+			p.w("rule build_pch")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  description = build_pch $out")
+			p.w("  depfile = $out.d")
+			p.w("  deps = gcc")
+		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -271,6 +321,10 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	end
+	p.w("rule custom_command")
+	p.w("  command = $CUSTOM_COMMAND")
+	p.w("  description = $CUSTOM_DESCRIPTION")
+	p.w("")
 
 	---------------------------------------------------- build all files
 	p.w("# build files")
@@ -284,19 +338,43 @@ function ninja.generateProjectCfg(cfg)
 			return cfg.targetextension
 		end
 	end
+	local pch_dependency = ""
+	if pch and toolset_name ~= "msc" then
+		pch_dependency = " | " .. pch .. ".gch"
+		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
+	end
 	local objfiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			-- TODO
+			local output = filecfg.buildOutputs[1]
+			local inputs = ""
+			if #filecfg.buildInputs > 0 then
+				inputs = table.implode(filecfg.buildInputs," ","","")
+			end
+
+			local commands = {}
+			if filecfg.buildmessage then
+				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, filecfg.project.basedir, filecfg.project.location)}
+			end
+			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildCommands, filecfg.project.basedir, filecfg.project.location))
+			if (#commands > 1) then
+				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+			else
+				commands = commands[1]
+			end
+
+			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.abspath) .. inputs)
+			p.w("  CUSTOM_COMMAND = " .. commands)
+			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath))
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath) .. pch_dependency)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath))
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath) .. pch_dependency)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
@@ -308,14 +386,25 @@ function ninja.generateProjectCfg(cfg)
 	p.w("")
 
 	---------------------------------------------------- build final target
+	local prebuild_dependency = ""
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		prebuild_dependency = " || prebuild"
+		p.w("# prebuild")
+		p.w("build prebuild: run_prebuild")
+	end
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		p.w("# postbuild")
+		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
+	end
+
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
 		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
@@ -334,12 +423,18 @@ function ninja.generateProjectCfg(cfg)
 
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. prebuild_dependency)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
 
+	p.w("")
+	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
+		p.w("build " .. key .. ": phony postbuild")
+	else
+		p.w("build " .. key .. ": phony " .. ninja.outputFilename(cfg))
+	end
 	p.w("")
 end
 
@@ -355,11 +450,11 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	
+
 	local ninjapath = relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg
-	
+
 	if cfg.platform ~= nil then ninjapath = ninjapath .. "_" .. cfg.platform end
-	
+
 	return ninjapath .. ".ninja"
 end
 
