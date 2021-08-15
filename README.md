@@ -10,9 +10,7 @@ Build.ninja file sets phony targets for configuration names so you can build the
 
 ### TODO
 
-- PCH not supported
 - Resources are not supported
-- Custom build rules are not supported 
 - Makefile not supported
 - Bundles of any sort are not supported
 - Clear methods are not supported
@@ -48,5 +46,7 @@ Build.ninja file sets phony targets for configuration names so you can build the
 	- WindowedApp works 
 	- StaticLib works
 	- SharedLib works
+	- PCH works
+	- Custom build rules works
 	- x86_64 tested, x86 not tested
 
