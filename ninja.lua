@@ -9,7 +9,6 @@
 local p = premake
 local tree = p.tree
 local project = p.project
-local solution = p.solution
 local config = p.config
 local fileconfig = p.fileconfig
 
@@ -44,7 +43,7 @@ function ninja.shesc(value)
 end
 
 -- generate solution that will call ninja for projects
-function ninja.generateSolution(sln)
+function ninja.generateWorkspace(wks)
 	local oldGetDefaultSeparator = path.getDefaultSeparator
 	path.getDefaultSeparator = function() return "/" end
 
@@ -58,8 +57,8 @@ function ninja.generateSolution(sln)
 	local cfg_first = nil
 	local cfg_first_lib = nil
 
-	for prj in solution.eachproject(sln) do
-		for cfg in project.eachconfig(prj) do
+	for prj in p.workspace.eachproject(wks) do
+		for cfg in p.project.eachconfig(prj) do
 			key = prj.name .. "_" .. cfg.buildcfg
 
 			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end

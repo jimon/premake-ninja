@@ -7,8 +7,6 @@
 --
 
 	local p = premake
-	local solution = premake.solution
-	local project = premake.project
 
 	newaction
 	{
@@ -24,12 +22,12 @@
 
 		toolset = "gcc",
 
-		-- Solution and project generation logic
-		onSolution = function(sln)
+		-- Workspace and project generation logic
+		onWorkspace = function(wks)
 			p.eol("\r\n")
 			p.indent("  ")
 			p.escaper(p.modules.ninja.esc)
-			p.generate(sln, "build.ninja", p.modules.ninja.generateSolution)
+			p.generate(wks, "build.ninja", p.modules.ninja.generateWorkspace)
 		end,
 		onProject = function(prj)
 			p.eol("\r\n")
