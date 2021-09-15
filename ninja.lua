@@ -106,6 +106,9 @@ end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
+	local oldGetDefaultSeparator = path.getDefaultSeparator
+	path.getDefaultSeparator = function() return "/" end
+
 	local prj = cfg.project
 	local key = prj.name .. "_" .. cfg.buildcfg
 
@@ -429,6 +432,8 @@ function ninja.generateProjectCfg(cfg)
 		p.w("build " .. key .. ": phony " .. ninja.outputFilename(cfg))
 	end
 	p.w("")
+
+	path.getDefaultSeparator = oldGetDefaultSeparator
 end
 
 -- return name of output binary relative to build folder
