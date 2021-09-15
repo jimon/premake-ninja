@@ -358,21 +358,21 @@ function ninja.generateProjectCfg(cfg)
 				commands = commands[1]
 			end
 
-			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.abspath) .. inputs)
+			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.relpath) .. inputs)
 			p.w("  CUSTOM_COMMAND = " .. commands)
 			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.abspath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.abspath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
 			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.abspath))
+			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.relpath))
 		end
 	end,
 	}, false, 1)
