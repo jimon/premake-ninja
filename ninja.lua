@@ -162,19 +162,13 @@ function ninja.generateProjectCfg(cfg)
 	end
 
 	---------------------------------------------------- figure out settings
-	globalincludes = {}
-	table.foreachi(cfg.includedirs, function(v)
-		-- TODO this is a bit obscure and currently I have no idea why exactly it's working
-		globalincludes[#globalincludes + 1] = project.getrelative(cfg.workspace, v)
-	end)
-
 	local buildopt =		ninja.list(cfg.buildoptions)
 	local cflags =			ninja.list(toolset.getcflags(cfg))
 	local cppflags =		ninja.list(toolset.getcppflags(cfg))
 	local cxxflags =		ninja.list(toolset.getcxxflags(cfg))
 	local warnings =		""
 	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes =		ninja.list(toolset.getincludedirs(cfg, globalincludes, cfg.sysincludedirs))
+	local includes =		ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
 	local forceincludes =	ninja.list(toolset.getforceincludes(cfg))
 	local pch = p.tools.gcc.getpch(cfg)
 	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
