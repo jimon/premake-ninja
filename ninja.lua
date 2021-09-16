@@ -344,7 +344,7 @@ function ninja.generateProjectCfg(cfg)
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			local output = filecfg.buildOutputs[1]
+			local output = project.getrelative(cfg.project, filecfg.buildOutputs[1])
 			local inputs = ""
 			if #filecfg.buildInputs > 0 then
 				inputs = table.implode(filecfg.buildInputs," ","","")
