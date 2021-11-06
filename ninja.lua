@@ -341,10 +341,9 @@ function ninja.generateProjectCfg(cfg)
 	local generated_files = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
-		local filecfg = fileconfig.getconfig(node, cfg)
-		local rule = p.global.getRuleForFile(node.name, prj.rules)
-		if fileconfig.hasCustomBuildRule(filecfg) then
+		function add_custom_rule(cfg, filecfg, filename)
 			local output = project.getrelative(cfg.project, filecfg.buildOutputs[1])
+			table.insert(generated_files, p.esc(output))
 			local inputs = ""
 			if #filecfg.buildInputs > 0 then
 				inputs = table.implode(filecfg.buildInputs," ","","")
@@ -352,18 +351,23 @@ function ninja.generateProjectCfg(cfg)
 
 			local commands = {}
 			if filecfg.buildmessage then
-				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, filecfg.project.basedir, filecfg.project.location)}
+				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, cfg.project.basedir, cfg.project.location)}
 			end
-			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildCommands, filecfg.project.basedir, filecfg.project.location))
+			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildCommands, cfg.project.basedir, cfg.project.location))
 			if (#commands > 1) then
 				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
 			else
 				commands = commands[1]
 			end
 
-			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.relpath) .. inputs)
+			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs)
 			p.w("  CUSTOM_COMMAND = " .. commands)
 			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
+		end
+		local filecfg = fileconfig.getconfig(node, cfg)
+		local rule = p.global.getRuleForFile(node.name, prj.rules)
+		if fileconfig.hasCustomBuildRule(filecfg) then
+			add_custom_rule(cfg, filecfg, node.relpath)
 		elseif rule then
 			local environ = table.shallowcopy(filecfg.environ)
 
@@ -371,35 +375,8 @@ function ninja.generateProjectCfg(cfg)
 				p.rule.prepareEnvironment(rule, environ, cfg)
 				p.rule.prepareEnvironment(rule, environ, filecfg)
 			end
-
-			local shadowContext = p.context.extent(rule, environ)
-
-			local buildoutputs  = shadowContext.buildoutputs
-			local buildmessage  = shadowContext.buildmessage
-			local buildcommands = shadowContext.buildcommands
-			local buildinputs   = shadowContext.buildinputs
-
-			local output = project.getrelative(cfg.project, buildoutputs[1])
-			table.insert(generated_files, p.esc(output))
-			local inputs = ""
-			if #buildinputs > 0 then
-				inputs = table.implode(buildinputs, " ", "", "")
-			end
-
-			local commands = {}
-			if buildmessage then
-				commands = {os.translateCommandsAndPaths("{ECHO} " .. buildmessage, filecfg.project.basedir, filecfg.project.location)}
-			end
-			commands = table.join(commands, os.translateCommandsAndPaths(buildcommands, filecfg.project.basedir, filecfg.project.location))
-			if (#commands > 1) then
-				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
-			else
-				commands = commands[1]
-			end
-
-			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(node.relpath) .. inputs)
-			p.w("  CUSTOM_COMMAND = " .. commands)
-			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
+			local rulecfg = p.context.extent(rule, environ)
+			add_custom_rule(cfg, rulecfg, node.relpath)
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
