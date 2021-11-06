@@ -52,7 +52,7 @@ function ninja.generateWorkspace(wks)
 	p.w("")
 
 	p.w("# build projects")
-	local cfgs = {} -- key is concatanated name or variant name, value is string of outputs names
+	local cfgs = {} -- key is concatenated name or variant name, value is string of outputs names
 	local key = ""
 	local cfg_first = nil
 	local cfg_first_lib = nil
@@ -104,43 +104,22 @@ function ninja.list(value)
 	end
 end
 
--- generate project + config build file
-function ninja.generateProjectCfg(cfg)
-	local oldGetDefaultSeparator = path.getDefaultSeparator
-	path.getDefaultSeparator = function() return "/" end
-
-	local prj = cfg.project
-	local key = prj.name .. "_" .. cfg.buildcfg
-
-	local toolset_name = _OPTIONS.cc or cfg.toolset
+local function getDefaultToolsetFromOs()
 	local system_name = os.target()
 
-	if toolset_name == nil then -- TODO why premake doesn't provide default name always ?
-		if system_name == "windows" then
-			toolset_name = "msc"
-		elseif system_name == "macosx" then
-			toolset_name = "clang"
-		elseif system_name == "linux" then
-			toolset_name = "gcc"
-		else
-			toolset_name = "gcc"
-			p.warnOnce("unknown_system", "no toolchain set and unknown system " .. system_name .. " so assuming toolchain is gcc")
-		end
+	if system_name == "windows" then
+		return "msc"
+	elseif system_name == "macosx" then
+		return "clang"
+	elseif system_name == "linux" then
+		return "gcc"
+	else
+		p.warnOnce("unknown_system", "no toolchain set and unknown system " .. system_name .. " so assuming toolchain is gcc")
+		return "gcc"
 	end
+end
 
-	local prj = cfg.project
-	local toolset = p.tools[toolset_name]
-
-	p.w("# project build file")
-	p.w("# generated with premake ninja")
-	p.w("")
-
-	-- premake-ninja relies on scoped rules
-	-- and they were added in ninja v1.6
-	p.w("ninja_required_version = 1.6")
-	p.w("")
-
-	---------------------------------------------------- figure out toolset executables
+local function getToolsetExecutables(cfg, toolset, toolset_name)
 	local cc = ""
 	local cxx = ""
 	local ar = ""
@@ -163,30 +142,52 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("unknown toolchain " .. toolset_name)
 	end
+	return cc, cxx, ar, link, rc
+end
+
+
+-- generate project + config build file
+function ninja.generateProjectCfg(cfg)
+	local oldGetDefaultSeparator = path.getDefaultSeparator
+	path.getDefaultSeparator = function() return "/" end
+
+	local prj = cfg.project
+	local key = prj.name .. "_" .. cfg.buildcfg
+	local prj = cfg.project
+	-- TODO why premake doesn't provide default name always ?
+	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
+	local toolset = p.tools[toolset_name]
+
+	p.w("# project build file")
+	p.w("# generated with premake ninja")
+	p.w("")
+
+	-- premake-ninja relies on scoped rules
+	-- and they were added in ninja v1.6
+	p.w("ninja_required_version = 1.6")
+	p.w("")
+
+	---------------------------------------------------- figure out toolset executables
+	local cc, cxx, ar, link, rc = getToolsetExecutables(cfg, toolset, toolset_name)
 
 	---------------------------------------------------- figure out settings
-	local buildopt =		ninja.list(cfg.buildoptions)
-	local cflags =			ninja.list(toolset.getcflags(cfg))
-	local cppflags =		ninja.list(toolset.getcppflags(cfg))
-	local cxxflags =		ninja.list(toolset.getcxxflags(cfg))
-	local warnings =		""
-	local defines =			ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes =		ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
-	local forceincludes =	ninja.list(toolset.getforceincludes(cfg))
+	local buildopt = ninja.list(cfg.buildoptions)
+	local cflags = ninja.list(toolset.getcflags(cfg))
+	local cppflags = ninja.list(toolset.getcppflags(cfg))
+	local cxxflags = ninja.list(toolset.getcxxflags(cfg))
+	local warnings = ""
+	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
+	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
+	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 	local pch = p.tools.gcc.getpch(cfg)
-	local ldflags =			ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
-	local libs =			""
+	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
+	-- we don't pass getlinks(cfg) through dependencies
+	-- because system libraries are often not in PATH so ninja can't find them
+	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 
 	if toolset_name == "msc" then
 		warnings = ninja.list(toolset.getwarnings(cfg))
-
-		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
-		default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
 	end
-
-	-- we don't pass getlinks(cfg) through dependencies
-	-- because system libraries are often not in PATH so ninja can't find them
-	libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 
 	-- experimental feature, change install_name of shared libs
 	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
@@ -233,7 +234,10 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = postbuild")
 		p.w("")
 	end
-	if toolset_name == "msc" then -- TODO /NOLOGO is invalid, we need to use /nologo
+	if toolset_name == "msc" then
+		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
+		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
+
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cc $out")
