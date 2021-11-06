@@ -175,7 +175,6 @@ function ninja.generateProjectCfg(cfg)
 	local cflags = ninja.list(toolset.getcflags(cfg))
 	local cppflags = ninja.list(toolset.getcppflags(cfg))
 	local cxxflags = ninja.list(toolset.getcxxflags(cfg))
-	local warnings = ""
 	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.sysincludedirs))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
@@ -185,17 +184,13 @@ function ninja.generateProjectCfg(cfg)
 	-- because system libraries are often not in PATH so ninja can't find them
 	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 
-	if toolset_name == "msc" then
-		warnings = ninja.list(toolset.getwarnings(cfg))
-	end
-
 	-- experimental feature, change install_name of shared libs
 	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
 
-	local all_cflags = buildopt .. cflags .. warnings .. defines .. includes .. forceincludes
-	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. warnings .. defines .. includes .. forceincludes
+	local all_cflags = buildopt .. cflags .. defines .. includes .. forceincludes
+	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 	local all_ldflags = ldflags
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
