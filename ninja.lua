@@ -153,7 +153,6 @@ function ninja.generateProjectCfg(cfg)
 
 	local prj = cfg.project
 	local key = prj.name .. "_" .. cfg.buildcfg
-	local prj = cfg.project
 	-- TODO why premake doesn't provide default name always ?
 	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
 	local toolset = p.tools[toolset_name]
