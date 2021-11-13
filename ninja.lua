@@ -58,24 +58,26 @@ function ninja.generateWorkspace(wks)
 	local cfg_first_lib = nil
 
 	for prj in p.workspace.eachproject(wks) do
-		for cfg in p.project.eachconfig(prj) do
-			key = prj.name .. "_" .. cfg.buildcfg
+		if p.action.supports(prj.kind) and prj.kind ~= p.NONE then
+			for cfg in p.project.eachconfig(prj) do
+				key = prj.name .. "_" .. cfg.buildcfg
 
-			if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
+				if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 
-			if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
-			cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. key .. " "
+				if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
+				cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. key .. " "
 
-			-- set first configuration name
-			if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
-				cfg_first = key
+				-- set first configuration name
+				if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
+					cfg_first = key
+				end
+				if (cfg_first_lib == nil) and (cfg.kind == p.STATICLIB or cfg.kind == p.SHAREDLIB) then
+					cfg_first_lib = key
+				end
+
+				-- include other ninja file
+				p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg, true)))
 			end
-			if (cfg_first_lib == nil) and (cfg.kind == p.STATICLIB or cfg.kind == p.SHAREDLIB) then
-				cfg_first_lib = key
-			end
-
-			-- include other ninja file
-			p.w("subninja " .. p.esc(ninja.projectCfgFilename(cfg, true)))
 		end
 	end
 
@@ -494,6 +496,9 @@ end
 
 -- generate all build files for every project configuration
 function ninja.generateProject(prj)
+	if not p.action.supports(prj.kind) or prj.kind == p.NONE then
+		return
+	end
 	for cfg in project.eachconfig(prj) do
 		p.generate(cfg, ninja.projectCfgFilename(cfg), ninja.generateProjectCfg)
 	end

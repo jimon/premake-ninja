@@ -16,7 +16,7 @@
 		description		= "Ninja is a small build system with a focus on speed",
 
 		-- The capabilities of this action
-		valid_kinds		= {"ConsoleApp", "WindowedApp", "Makefile", "SharedLib", "StaticLib"}, -- TODO do we need MakeFile ?
+		valid_kinds		= {"ConsoleApp", "WindowedApp", "SharedLib", "StaticLib", "None"}, -- Not supported: Makefile, Packaging, SharedItems, Utility
 		valid_languages	= {"C", "C++"},
 		valid_tools		= {cc = { "gcc", "clang", "msc" }},
 
