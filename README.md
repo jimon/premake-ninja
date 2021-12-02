@@ -50,3 +50,6 @@ Build.ninja file sets phony targets for configuration names so you can build the
 	- Custom build rules works
 	- x86_64 tested, x86 not tested
 
+### Extra Tests
+
+Part of integration tests of several generators in https://github.com/Jarod42/premake-sample-projects
