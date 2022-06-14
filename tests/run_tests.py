@@ -133,7 +133,8 @@ class Helper(unittest.TestCase):
 		if os.path.exists(path):
 			current_cwd = os.getcwd()
 			os.chdir(self.build_dir)
-			subprocess.check_call([os.path.relpath(path, self.build_dir)])
+			executable = os.path.relpath(path, self.build_dir)
+			subprocess.check_call([executable], env={'LD_LIBRARY_PATH': os.path.dirname(executable)})
 			os.chdir(current_cwd)
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
@@ -200,8 +201,8 @@ class TestStaticLib(Helper):
 	def test_withapp(self):
 		self.enter_test("static_lib/withapp")
 		self.check_basics("build/bin_debug/ninjatestprj_app", "build/bin_release/ninjatestprj_app")
-		self.out_exist("build/bin_debug/ninjatestprj_lib test1")
-		self.out_exist("build/bin_release/ninjatestprj_lib test1")
+		self.out_exist("build/bin_debug/ninjatestprj_lib_test1")
+		self.out_exist("build/bin_release/ninjatestprj_lib_test1")
 		self.out_exist("build/bin_debug/ninjatestprj_lib_test2")
 		self.out_exist("build/bin_release/ninjatestprj_lib_test2")
 		self.exit_test()

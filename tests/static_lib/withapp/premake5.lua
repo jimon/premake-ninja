@@ -12,7 +12,7 @@ project "ninjatestprj_app"
 
 	files {"main.cpp"}
 	includedirs {"test1", "test2"}
-	links {"ninjatestprj_lib test1", "ninjatestprj_lib_test2"}
+	links {"ninjatestprj_lib_test1", "ninjatestprj_lib_test2"}
 
 	configuration "windows"
 		links { "user32", "gdi32" }
@@ -29,7 +29,7 @@ project "ninjatestprj_app"
 		defines {"NDEBUG"}
 		optimize "On"
 
-project "ninjatestprj_lib test1"
+project "ninjatestprj_lib_test1"
 	kind "StaticLib"
 	location "build"
 	language "C++"

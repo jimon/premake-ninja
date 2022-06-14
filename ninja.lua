@@ -368,8 +368,10 @@ function ninja.generateProjectCfg(cfg)
 		end
 		local filecfg = fileconfig.getconfig(node, cfg)
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
+		-- Paths in subninjas need to be relative to the build directory - https://github.com/ninja-build/ninja/issues/977
+		local normalize_node_path = path.getrelative(cfg.workspace.location, node.abspath)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			add_custom_rule(cfg, filecfg, node.relpath)
+			add_custom_rule(cfg, filecfg, normalize_node_path)
 		elseif rule then
 			local environ = table.shallowcopy(filecfg.environ)
 
@@ -378,19 +380,19 @@ function ninja.generateProjectCfg(cfg)
 				p.rule.prepareEnvironment(rule, environ, filecfg)
 			end
 			local rulecfg = p.context.extent(rule, environ)
-			add_custom_rule(cfg, rulecfg, node.relpath)
+			add_custom_rule(cfg, rulecfg, normalize_node_path)
 		elseif path.iscppfile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(normalize_node_path) .. pch_dependency)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(normalize_node_path) .. pch_dependency)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
 			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.relpath))
+			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(normalize_node_path))
 		end
 	end,
 	}, false, 1)
