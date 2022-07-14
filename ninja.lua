@@ -344,18 +344,18 @@ function ninja.generateProjectCfg(cfg)
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		function add_custom_rule(cfg, filecfg, filename)
-			local output = project.getrelative(cfg.project, filecfg.buildOutputs[1])
+			local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
 			table.insert(generated_files, p.esc(output))
 			local inputs = ""
-			if #filecfg.buildInputs > 0 then
-				inputs = table.implode(filecfg.buildInputs," ","","")
+			if #filecfg.buildinputs > 0 then
+				inputs = table.implode(filecfg.buildinputs," ","","")
 			end
 
 			local commands = {}
 			if filecfg.buildmessage then
 				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, cfg.project.basedir, cfg.project.location)}
 			end
-			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildCommands, cfg.project.basedir, cfg.project.location))
+			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, cfg.project.basedir, cfg.project.location))
 			if (#commands > 1) then
 				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
 			else
