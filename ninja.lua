@@ -23,6 +23,14 @@ function ninja.esc(value)
 	return value
 end
 
+function ninja.quote(value)
+	value = value:gsub("\\", "\\\\")
+	value = value:gsub("'", "\\'")
+	value = value:gsub("\"", "\\\"")
+
+	return "\"" .. value .. "\""
+end
+
 -- in some cases we write file names in rule commands directly
 -- so we need to propely escape them
 function ninja.shesc(value)
@@ -36,9 +44,8 @@ function ninja.shesc(value)
 	end
 
 	if value:find(" ") then
-		return "\"" .. value .. "\""
+		return ninja.quote(value)
 	end
-
 	return value
 end
 
@@ -205,7 +212,7 @@ function ninja.generateProjectCfg(cfg)
 		end
 		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.project.basedir, cfg.project.location))
 		if (#commands > 1) then
-			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
 			commands = commands[1]
 		end
@@ -221,7 +228,7 @@ function ninja.generateProjectCfg(cfg)
 		end
 		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.project.basedir, cfg.project.location))
 		if (#commands > 1) then
-			commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
 			commands = commands[1]
 		end
@@ -357,7 +364,7 @@ function ninja.generateProjectCfg(cfg)
 			end
 			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, cfg.project.basedir, cfg.project.location))
 			if (#commands > 1) then
-				commands = 'sh -c "' .. table.implode(commands,"","",";") .. '"'
+				commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 			else
 				commands = commands[1]
 			end
