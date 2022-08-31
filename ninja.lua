@@ -346,13 +346,40 @@ function ninja.generateProjectCfg(cfg)
 		pch_dependency = " | " .. pch .. ".gch"
 		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
 	end
-	local objfiles = {}
+
 	local generated_files = {}
+	tree.traverse(project.getsourcetree(prj), {
+	onleaf = function(node, depth)
+		function collect_generated_files(cfg, filecfg)
+			local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
+			table.insert(generated_files, p.esc(output))
+		end
+		local filecfg = fileconfig.getconfig(node, cfg)
+		local rule = p.global.getRuleForFile(node.name, prj.rules)
+		if fileconfig.hasCustomBuildRule(filecfg) then
+			collect_generated_files(cfg, filecfg)
+		elseif rule then
+			local environ = table.shallowcopy(filecfg.environ)
+
+			if rule.propertydefinition then
+				p.rule.prepareEnvironment(rule, environ, cfg)
+				p.rule.prepareEnvironment(rule, environ, filecfg)
+			end
+			local rulecfg = p.context.extent(rule, environ)
+			collect_generated_files(cfg, rulecfg)
+		end
+	end,
+	}, false, 1)
+	local dependencies_on_generated_files = ""
+	if #generated_files > 0 then
+		dependencies_on_generated_files = " || generated_files_" .. key
+	end
+
+	local objfiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		function add_custom_rule(cfg, filecfg, filename)
 			local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
-			table.insert(generated_files, p.esc(output))
 			local inputs = ""
 			if #filecfg.buildinputs > 0 then
 				inputs = table.implode(filecfg.buildinputs," ","","")
@@ -390,9 +417,9 @@ function ninja.generateProjectCfg(cfg)
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. dependencies_on_generated_files)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency)
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. dependencies_on_generated_files)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
@@ -402,6 +429,12 @@ function ninja.generateProjectCfg(cfg)
 	end,
 	}, false, 1)
 	p.w("")
+
+	if #generated_files > 0 then
+		p.w("# generated files")
+		p.w("build generated_files_" .. key .. ": phony" .. ninja.list(generated_files))
+	end
+
 
 	---------------------------------------------------- build final target
 	local final_dependency = ""
@@ -416,13 +449,12 @@ function ninja.generateProjectCfg(cfg)
 		p.w("# postbuild")
 		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
 	end
+	local generated_dependency = ""
 	if #generated_files > 0 then
 		final_dependency = " ||"
-		generated_files = table.implode(generated_files, " ", "", "")
-	else
-	  generated_files = ""
+		generated_dependency = " generated_files_" .. key
 	end
-  final_dependency = final_dependency .. prebuild_dependency .. generated_files
+  final_dependency = final_dependency .. prebuild_dependency .. generated_dependency
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
 		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
