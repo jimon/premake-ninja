@@ -454,7 +454,12 @@ function ninja.generateProjectCfg(cfg)
 		final_dependency = " ||"
 		generated_dependency = " generated_files_" .. key
 	end
-  final_dependency = final_dependency .. prebuild_dependency .. generated_dependency
+	local dependson_dependency = ""
+	if #cfg.dependson > 0 then
+		final_dependency = " ||"
+		dependson_dependency = " " .. table.implode(cfg.dependson, "", "_" .. cfg.buildcfg, " ")
+	end
+	final_dependency = final_dependency .. prebuild_dependency .. generated_dependency .. dependson_dependency
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
 		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
