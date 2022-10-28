@@ -154,6 +154,16 @@ local function getToolsetExecutables(cfg, toolset, toolset_name)
 	return cc, cxx, ar, link, rc
 end
 
+local function getFileDependencies(cfg)
+	local dependencies = {}
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		dependencies = {"prebuild"}
+	end
+	for i = 1, #cfg.dependson do
+		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg)
+	end
+	return dependencies
+end
 
 -- generate project + config build file
 function ninja.generateProjectCfg(cfg)
@@ -370,9 +380,13 @@ function ninja.generateProjectCfg(cfg)
 		end
 	end,
 	}, false, 1)
-	local dependencies_on_generated_files = ""
+	
+	local file_dependencies = getFileDependencies(cfg)
+	local regular_file_dependencies = ""
 	if #generated_files > 0 then
-		dependencies_on_generated_files = " || generated_files_" .. key
+		regular_file_dependencies = " || generated_files_" .. key .. ninja.list(file_dependencies)
+	elseif #file_dependencies > 0 then
+		regular_file_dependencies = " ||" .. ninja.list(file_dependencies)
 	end
 
 	local objfiles = {}
@@ -396,7 +410,7 @@ function ninja.generateProjectCfg(cfg)
 				commands = commands[1]
 			end
 
-			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs)
+			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies))
 			p.w("  CUSTOM_COMMAND = " .. commands)
 			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
 		end
@@ -417,9 +431,9 @@ function ninja.generateProjectCfg(cfg)
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
 			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. dependencies_on_generated_files)
+				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
 			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. dependencies_on_generated_files)
+				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
 			end
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
@@ -430,18 +444,15 @@ function ninja.generateProjectCfg(cfg)
 	}, false, 1)
 	p.w("")
 
+	local final_dependency = ""
 	if #generated_files > 0 then
 		p.w("# generated files")
 		p.w("build generated_files_" .. key .. ": phony" .. ninja.list(generated_files))
+		final_dependency = " || generated_files_" .. key
 	end
 
-
 	---------------------------------------------------- build final target
-	local final_dependency = ""
-	local prebuild_dependency = ""
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
-		final_dependency = " ||"
-		prebuild_dependency = " prebuild"
 		p.w("# prebuild")
 		p.w("build prebuild: run_prebuild")
 	end
@@ -449,17 +460,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("# postbuild")
 		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
 	end
-	local generated_dependency = ""
-	if #generated_files > 0 then
-		final_dependency = " ||"
-		generated_dependency = " generated_files_" .. key
-	end
-	local dependson_dependency = ""
-	if #cfg.dependson > 0 then
-		final_dependency = " ||"
-		dependson_dependency = " " .. table.implode(cfg.dependson, "", "_" .. cfg.buildcfg, " ")
-	end
-	final_dependency = final_dependency .. prebuild_dependency .. generated_dependency .. dependson_dependency
+
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
 		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
