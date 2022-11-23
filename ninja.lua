@@ -249,7 +249,7 @@ function ninja.generateProjectCfg(cfg)
 	end
 	if toolset_name == "msc" then
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
-		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib "
+		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
 
 		p.w("rule cc")
 		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
@@ -270,7 +270,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = rc $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg))) .. default_msvc_libs .. " /link " .. all_ldflags .. " /nologo /out:$out")
+		p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "clang" then
@@ -300,7 +300,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " -o $out $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg, "system"))) .. " " .. all_ldflags)
+		p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
 		p.w("  description = link $out")
 		p.w("")
 	elseif toolset_name == "gcc" then
@@ -330,7 +330,7 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
-		p.w("  command = " .. link .. " -o $out $in " .. ninja.list(ninja.shesc(toolset.getlinks(cfg, "system"))) .. " " .. all_ldflags)
+		p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
 		p.w("  description = link $out")
 		p.w("")
 	end
@@ -463,31 +463,28 @@ function ninja.generateProjectCfg(cfg)
 
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
 		p.w("# link shared lib")
-		p.w("build " .. p.esc(output) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
 
-		-- TODO I'm a bit confused here, previous build statement builds .dll/.so file
-		-- but there are like no obvious way to tell ninja that .lib/.a is also build there
-		-- and we use .lib/.a later on as dependency for linkage
-		-- so let's create phony build statements for this, not sure if it's the best solution
-		-- UPD this can be fixed by https://github.com/martine/ninja/pull/989
+		local extra_output = ""
 		if ninja.endsWith(output, ".dll") then
-			p.w("build " .. p.esc(ninja.noext(output, ".dll")) .. ".lib: phony " .. p.esc(output))
+			extra_output = " | " .. p.esc(ninja.noext(output, ".dll")) .. ".lib" .. " " .. p.esc(ninja.noext(output, ".dll")) .. ".exp"
 		elseif ninja.endsWith(output, ".so") then
-			p.w("build " .. p.esc(ninja.noext(output, ".so")) .. ".a: phony " .. p.esc(output))
+			extra_output = " | " .. p.esc(ninja.noext(output, ".so")) .. ".a"
 		elseif ninja.endsWith(output, ".dylib") then
-			-- but in case of .dylib there are no corresponding .a file
+			-- in case of .dylib there are no corresponding .a file
 		else
 			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
 		end
 
+		p.w("build " .. p.esc(output) .. extra_output .. ": link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. " " .. libs .. final_dependency)
+		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
