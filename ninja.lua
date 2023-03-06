@@ -113,6 +113,20 @@ function ninja.list(value)
 	end
 end
 
+local function shouldcompileasc(filecfg)
+	if filecfg.compileas and filecfg.compileas ~= "Default" then
+		return p.languages.isc(filecfg.compileas)
+	end
+	return path.iscfile(filecfg.abspath)
+end
+
+local function shouldcompileascpp(filecfg)
+	if filecfg.compileas and filecfg.compileas ~= "Default" then
+		return p.languages.iscpp(filecfg.compileas)
+	end
+	return path.iscppfile(filecfg.abspath)
+end
+
 local function getDefaultToolsetFromOs()
 	local system_name = os.target()
 
@@ -284,13 +298,13 @@ function ninja.generateProjectCfg(cfg)
 			p.w("  deps = gcc")
 		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -314,13 +328,13 @@ function ninja.generateProjectCfg(cfg)
 			p.w("  deps = gcc")
 		end
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -427,14 +441,14 @@ function ninja.generateProjectCfg(cfg)
 			end
 			local rulecfg = p.context.extent(rule, environ)
 			add_custom_rule(cfg, rulecfg, node.relpath)
-		elseif path.iscppfile(node.abspath) then
+		elseif shouldcompileasc(filecfg) then
 			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
 			objfiles[#objfiles + 1] = objfilename
-			if ninja.endsWith(node.abspath, ".c") then
-				p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-			else
-				p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-			end
+			p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
+		elseif shouldcompileascpp(filecfg) then
+			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
+			objfiles[#objfiles + 1] = objfilename
+			p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
 		elseif path.isresourcefile(node.abspath) then
 			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
 			objfiles[#objfiles + 1] = objfilename
