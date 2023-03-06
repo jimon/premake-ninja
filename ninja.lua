@@ -221,8 +221,8 @@ function ninja.generateProjectCfg(cfg)
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
 
-	local all_cflags = buildopt .. cflags .. defines .. includes .. forceincludes
-	local all_cxxflags = buildopt .. cflags .. cppflags .. cxxflags .. defines .. includes .. forceincludes
+	local all_cflags = buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
+	local all_cxxflags = buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 	local all_ldflags = ldflags
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
