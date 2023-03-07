@@ -275,14 +275,17 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("  command = " .. rc .. " /nologo /fo$out $in")
 		p.w("  description = rc $out")
 		p.w("")
-		p.w("rule ar")
-		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
-		p.w("  description = ar $out")
-		p.w("")
-		p.w("rule link")
-		p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
-		p.w("  description = link $out")
-		p.w("")
+		if cfg.kind == p.STATICLIB then
+			p.w("rule ar")
+			p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
+			p.w("  description = ar $out")
+			p.w("")
+		else
+			p.w("rule link")
+			p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
+			p.w("  description = link $out")
+			p.w("")
+		end
 	elseif toolset_name == "clang" then
 		local force_include_pch = ""
 		if pch then
@@ -305,14 +308,17 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
-		p.w("rule ar")
-		p.w("  command = " .. ar .. " rcs $out $in")
-		p.w("  description = ar $out")
-		p.w("")
-		p.w("rule link")
-		p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
-		p.w("  description = link $out")
-		p.w("")
+		if cfg.kind == p.STATICLIB then
+			p.w("rule ar")
+			p.w("  command = " .. ar .. " rcs $out $in")
+			p.w("  description = ar $out")
+			p.w("")
+		else
+			p.w("rule link")
+			p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
+			p.w("  description = link $out")
+			p.w("")
+		end
 	elseif toolset_name == "gcc" then
 		local force_include_pch = ""
 		if pch then
@@ -335,14 +341,17 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
-		p.w("rule ar")
-		p.w("  command = " .. ar .. " rcs $out $in")
-		p.w("  description = ar $out")
-		p.w("")
-		p.w("rule link")
-		p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
-		p.w("  description = link $out")
-		p.w("")
+		if cfg.kind == p.STATICLIB then
+			p.w("rule ar")
+			p.w("  command = " .. ar .. " rcs $out $in")
+			p.w("  description = ar $out")
+			p.w("")
+		else
+			p.w("rule link")
+			p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
+			p.w("  description = link $out")
+			p.w("")
+		end
 	end
 end
 
