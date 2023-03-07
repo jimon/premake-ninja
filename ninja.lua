@@ -429,8 +429,8 @@ local function pch_build(pch, toolset_name)
 	return pch_dependency
 end
 
-local function custom_command_build(cfg, filecfg, filename, file_dependencies)
-	local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
+local function custom_command_build(prj, cfg, filecfg, filename, file_dependencies)
+	local output = project.getrelative(prj, filecfg.buildoutputs[1])
 	local inputs = ""
 	if #filecfg.buildinputs > 0 then
 		inputs = table.implode(filecfg.buildinputs," ","","")
@@ -484,7 +484,7 @@ local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regu
 		local filecfg = fileconfig.getconfig(node, cfg)
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			custom_command_build(cfg, filecfg, node.relpath, file_dependencies)
+			custom_command_build(prj, cfg, filecfg, node.relpath, file_dependencies)
 		elseif rule then
 			local environ = table.shallowcopy(filecfg.environ)
 
@@ -493,7 +493,7 @@ local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regu
 				p.rule.prepareEnvironment(rule, environ, filecfg)
 			end
 			local rulecfg = p.context.extent(rule, environ)
-			custom_command_build(cfg, rulecfg, node.relpath, file_dependencies)
+			custom_command_build(prj, cfg, rulecfg, node.relpath, file_dependencies)
 		else
 			compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
 		end
