@@ -15,6 +15,55 @@ local fileconfig = p.fileconfig
 premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
+local function get_key(cfg)
+	if cfg.platform then
+		return cfg.project.name .. "_" .. cfg.buildcfg .. "_" .. cfg.platform
+	else
+		return cfg.project.name .. "_" .. cfg.buildcfg
+	end
+end
+
+local build_cache = {}
+
+local function add_build(cfg, output, extra_outputs, command, args)
+	local cached = build_cache[output]
+	if cached ~= nil then
+		if extra_outputs == cached.extra_outputs
+			and command == cached.command
+			and table.equals(args, cached.args)
+		then
+			-- custom_command rule is identical for each configuration (contrary to other rules)
+			-- So we can compare extra parameter
+			if string.startswith(cached.command, "custom_command") then
+				p.w("# INFO: Rule ignored, same as " .. cached.cfg_key)
+			else
+				local cfg_key = get_key(cfg)
+				p.warn(cached.cfg_key .. " and " .. cfg_key .. " both generate (differently?) " .. output .. ". Ignoring " .. cfg_key)
+				p.w("# WARNING: Rule ignored, using the one from " .. cached.cfg_key)
+			end
+		else
+			local cfg_key = get_key(cfg)
+			p.warn(cached.cfg_key .. " and " .. cfg_key .. " both generate differently " .. output .. ". Ignoring " .. cfg_key)
+			p.w("# ERROR: Rule ignored, using the one from " .. cached.cfg_key)
+		end
+		p.w("# build " .. output .. ": " .. command)
+		for i, arg in ipairs(args or {}) do
+			p.w("#   " .. arg)
+		end
+		return
+	end
+	p.w("build " .. output .. ": " .. command)
+	for i, arg in ipairs(args or {}) do
+		p.w("  " .. arg)
+	end
+	build_cache[output] = {
+		cfg_key = get_key(cfg),
+		extra_outputs = extra_outputs,
+		command = command,
+		args = args
+	}
+end
+
 function ninja.esc(value)
 	value = value:gsub("%$", "$$") -- TODO maybe there is better way
 	value = value:gsub(":", "$:")
@@ -171,7 +220,7 @@ end
 local function getFileDependencies(cfg)
 	local dependencies = {}
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
-		dependencies = {"prebuild"}
+		dependencies = {"prebuild_" .. get_key(cfg)}
 	end
 	for i = 1, #cfg.dependson do
 		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg)
@@ -420,11 +469,11 @@ local function collect_generated_files(prj, cfg)
 	return generated_files
 end
 
-local function pch_build(pch, toolset_name)
+local function pch_build(cfg, pch, toolset_name)
 	local pch_dependency = ""
 	if pch and toolset_name ~= "msc" then
 		pch_dependency = " | " .. pch .. ".gch"
-		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
+		add_build(cfg, p.esc(pch).. ".gch", "", "build_pch " .. p.esc(pch))
 	end
 	return pch_dependency
 end
@@ -447,9 +496,8 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		commands = commands[1]
 	end
 
-	p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies))
-	p.w("  CUSTOM_COMMAND = " .. commands)
-	p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
+	add_build(cfg, p.esc(output), "", "custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies), 
+		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. p.esc(output)})
 end
 
 local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
@@ -459,21 +507,23 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	if shouldcompileasc(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
 		objfiles[#objfiles + 1] = objfilename
-		p.w("build " .. p.esc(objfilename) .. iif(has_custom_settings, ": cc_flags ", ": cc ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies)
+		local cflags = {}
 		if has_custom_settings then
-			p.w("  CFLAGS = " .. getcflags(toolset, cfg, filecfg))
+			cflags = {"CFLAGS = " .. getcflags(toolset, cfg, filecfg)}
 		end
+		add_build(cfg, p.esc(objfilename), "", iif(has_custom_settings, "cc_flags ", "cc ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
 		objfiles[#objfiles + 1] = objfilename
-		p.w("build " .. p.esc(objfilename) .. iif(has_custom_settings, ": cxx_flags ", ": cxx ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies)
+		local cxxflags = {}
 		if has_custom_settings then
-			p.w("  CXXFLAGS = " .. getcxxflags(toolset, cfg, filecfg))
+			cxxflags = {"CXXFLAGS = " .. getcxxflags(toolset, cfg, filecfg)}
 		end
+		add_build(cfg, p.esc(objfilename), "", iif(has_custom_settings, "cxx_flags ", "cxx ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
-		p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(filecfg.relpath))
+		add_build(cfg, p.esc(objfilename), "", "rc " .. p.esc(filecfg.relpath))
 	end
 end
 
@@ -504,11 +554,11 @@ local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regu
 	return objfiles
 end
 
-local function generated_files_build(generated_files, key)
+local function generated_files_build(cfg, generated_files, key)
 	local final_dependency = ""
 	if #generated_files > 0 then
 		p.w("# generated files")
-		p.w("build generated_files_" .. key .. ": phony" .. ninja.list(generated_files))
+		add_build(cfg, "generated_files_" .. key, "", "phony" .. ninja.list(generated_files))
 		final_dependency = " || generated_files_" .. key
 	end
 	return final_dependency
@@ -547,7 +597,7 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build all files
 	p.w("# build files")
 
-	local pch_dependency = pch_build(pch, toolset_name)
+	local pch_dependency = pch_build(cfg, pch, toolset_name)
 
 	local generated_files = collect_generated_files(prj, cfg)
 	local file_dependencies = getFileDependencies(cfg)
@@ -560,16 +610,16 @@ function ninja.generateProjectCfg(cfg)
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local objfiles = files_build(prj, cfg, toolset, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
-	local final_dependency = generated_files_build(generated_files, key)
+	local final_dependency = generated_files_build(cfg, generated_files, key)
 
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		p.w("# prebuild")
-		p.w("build prebuild: run_prebuild")
+		add_build(cfg, "prebuild_" .. get_key(cfg), "", "run_prebuild")
 	end
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		p.w("# postbuild")
-		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
+		add_build(cfg, "postbuild_" .. get_key(cfg), "", "run_postbuild | " .. ninja.outputFilename(cfg))
 	end
 
 	-- we don't pass getlinks(cfg) through dependencies
@@ -577,7 +627,7 @@ function ninja.generateProjectCfg(cfg)
 	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
@@ -594,11 +644,11 @@ function ninja.generateProjectCfg(cfg)
 			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
 		end
 
-		p.w("build " .. p.esc(output) .. extra_output .. ": link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(output), extra_output, "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
 
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
@@ -606,9 +656,9 @@ function ninja.generateProjectCfg(cfg)
 
 	p.w("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
-		p.w("build " .. key .. ": phony postbuild")
+		add_build(cfg, key, "", "phony postbuild_" .. get_key(cfg))
 	else
-		p.w("build " .. key .. ": phony " .. ninja.outputFilename(cfg))
+		add_build(cfg, key, "", "phony " .. ninja.outputFilename(cfg))
 	end
 	p.w("")
 
