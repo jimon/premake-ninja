@@ -179,25 +179,24 @@ local function getFileDependencies(cfg)
 	return dependencies
 end
 
-local function getcflags(toolset, cfg)
-	local buildopt = ninja.list(cfg.buildoptions)
-	local cppflags = ninja.list(toolset.getcppflags(cfg))
-	local cflags = ninja.list(toolset.getcflags(cfg))
-	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.externalincludedirs))
+local function getcflags(toolset, cfg, filecfg)
+	local buildopt = ninja.list(filecfg.buildoptions)
+	local cppflags = ninja.list(toolset.getcppflags(filecfg))
+	local cflags = ninja.list(toolset.getcflags(filecfg))
+	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
+	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 
 	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
 end
 
-local function getcxxflags(toolset, cfg)
-	local buildopt = ninja.list(cfg.buildoptions)
-	local cppflags = ninja.list(toolset.getcppflags(cfg))
-	local cxxflags = ninja.list(toolset.getcxxflags(cfg))
-	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.externalincludedirs))
+local function getcxxflags(toolset, cfg, filecfg)
+	local buildopt = ninja.list(filecfg.buildoptions)
+	local cppflags = ninja.list(toolset.getcppflags(filecfg))
+	local cxxflags = ninja.list(toolset.getcxxflags(filecfg))
+	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
+	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
-
 	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 end
 
@@ -253,8 +252,8 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 	---------------------------------------------------- figure out toolset executables
 	local cc, cxx, ar, link, rc = getToolsetExecutables(cfg, toolset, toolset_name)
 
-	local all_cflags = getcflags(toolset, cfg)
-	local all_cxxflags = getcxxflags(toolset, cfg)
+	local all_cflags = getcflags(toolset, cfg, cfg)
+	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
 	local all_ldflags = getldflags(toolset, cfg)
 
 	if toolset_name == "msc" then
@@ -268,6 +267,16 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("")
 		p.w("rule cxx")
 		p.w("  command = " .. cxx .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
+		p.w("  description = cxx $out")
+		p.w("  deps = msvc")
+		p.w("")
+		p.w("rule cc_flags")
+		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
+		p.w("  description = cc $out")
+		p.w("  deps = msvc")
+		p.w("")
+		p.w("rule cxx_flags")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
 		p.w("")
@@ -308,6 +317,17 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
+		p.w("rule cc_flags")
+		p.w("  command = " .. cc .. " $CFLAGS".. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cc $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule cxx_flags")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cxx $out")
+		p.w("  deps = msvc")
+		p.w("")
 		if cfg.kind == p.STATICLIB then
 			p.w("rule ar")
 			p.w("  command = " .. ar .. " rcs $out $in")
@@ -340,6 +360,17 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule cc_flags")
+		p.w("  command = " .. cc .. " $CFLAGS".. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cc $out")
+		p.w("  depfile = $out.d")
+		p.w("  deps = gcc")
+		p.w("")
+		p.w("rule cxx_flags")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
+		p.w("  description = cxx $out")
+		p.w("  deps = msvc")
 		p.w("")
 		if cfg.kind == p.STATICLIB then
 			p.w("rule ar")
@@ -421,8 +452,32 @@ local function custom_command_build(cfg, filecfg, filename, file_dependencies)
 	p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
 end
 
-local function files_build(prj, cfg, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
+	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
+
+	if shouldcompileasc(filecfg) then
+		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
+		objfiles[#objfiles + 1] = objfilename
+		p.w("build " .. p.esc(objfilename) .. iif(has_custom_settings, ": cc_flags ", ": cc ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies)
+		if has_custom_settings then
+			p.w("  CFLAGS = " .. getcflags(toolset, cfg, filecfg))
+		end
+	elseif shouldcompileascpp(filecfg) then
+		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
+		objfiles[#objfiles + 1] = objfilename
+		p.w("build " .. p.esc(objfilename) .. iif(has_custom_settings, ": cxx_flags ", ": cxx ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies)
+		if has_custom_settings then
+			p.w("  CXXFLAGS = " .. getcxxflags(toolset, cfg, filecfg))
+		end
+	elseif path.isresourcefile(filecfg.abspath) then
+		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
+		objfiles[#objfiles + 1] = objfilename
+		p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(filecfg.relpath))
+	end
+end
+
+local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
 	local objfiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
@@ -439,18 +494,8 @@ local function files_build(prj, cfg, toolset_name, pch_dependency, regular_file_
 			end
 			local rulecfg = p.context.extent(rule, environ)
 			custom_command_build(cfg, rulecfg, node.relpath, file_dependencies)
-		elseif shouldcompileasc(filecfg) then
-			local objfilename = obj_dir .. "/" .. node.objname .. iif(toolset_name == "msc", ".obj", ".o")
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-		elseif shouldcompileascpp(filecfg) then
-			local objfilename = obj_dir .. "/" .. node.objname .. iif(toolset_name == "msc", ".obj", ".o")
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-		elseif path.isresourcefile(node.abspath) then
-			local objfilename = obj_dir .. "/" .. node.name .. ".res"
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.relpath))
+		else
+			compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
 		end
 	end,
 	}, false, 1)
@@ -514,7 +559,7 @@ function ninja.generateProjectCfg(cfg)
 	end
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
-	local objfiles = files_build(prj, cfg, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+	local objfiles = files_build(prj, cfg, toolset, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
 	local final_dependency = generated_files_build(generated_files, key)
 
 	---------------------------------------------------- build final target
