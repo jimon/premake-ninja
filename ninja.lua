@@ -179,56 +179,39 @@ local function getFileDependencies(cfg)
 	return dependencies
 end
 
--- generate project + config build file
-function ninja.generateProjectCfg(cfg)
-	local oldGetDefaultSeparator = path.getDefaultSeparator
-	path.getDefaultSeparator = function() return "/" end
-
-	local prj = cfg.project
-	local key = prj.name .. "_" .. cfg.buildcfg
-	-- TODO why premake doesn't provide default name always ?
-	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
-	local toolset = p.tools[toolset_name]
-
-	p.w("# project build file")
-	p.w("# generated with premake ninja")
-	p.w("")
-
-	-- premake-ninja relies on scoped rules
-	-- and they were added in ninja v1.6
-	p.w("ninja_required_version = 1.6")
-	p.w("")
-
-	---------------------------------------------------- figure out toolset executables
-	local cc, cxx, ar, link, rc = getToolsetExecutables(cfg, toolset, toolset_name)
-
-	---------------------------------------------------- figure out settings
+local function getcflags(toolset, cfg)
 	local buildopt = ninja.list(cfg.buildoptions)
+	local cppflags = ninja.list(toolset.getcppflags(cfg))
 	local cflags = ninja.list(toolset.getcflags(cfg))
+	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
+	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.externalincludedirs))
+	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
+
+	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
+end
+
+local function getcxxflags(toolset, cfg)
+	local buildopt = ninja.list(cfg.buildoptions)
 	local cppflags = ninja.list(toolset.getcppflags(cfg))
 	local cxxflags = ninja.list(toolset.getcxxflags(cfg))
 	local defines = ninja.list(table.join(toolset.getdefines(cfg.defines), toolset.getundefines(cfg.undefines)))
 	local includes = ninja.list(toolset.getincludedirs(cfg, cfg.includedirs, cfg.externalincludedirs))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
-	local pch = p.tools.gcc.getpch(cfg)
+
+	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
+end
+
+local function getldflags(toolset, cfg)
 	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
-	-- we don't pass getlinks(cfg) through dependencies
-	-- because system libraries are often not in PATH so ninja can't find them
-	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 
 	-- experimental feature, change install_name of shared libs
 	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
+	return ldflags
+end
 
-	local all_cflags = buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
-	local all_cxxflags = buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
-	local all_ldflags = ldflags
-
-	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
-
-	---------------------------------------------------- write rules
-	p.w("# core rules for " .. cfg.name)
+local function prebuild_rule(cfg)
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		local commands = {}
 		if cfg.prebuildmessage then
@@ -245,6 +228,9 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = prebuild")
 		p.w("")
 	end
+end
+
+local function postbuild_rule(cfg)
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		local commands = {}
 		if cfg.postbuildmessage then
@@ -261,6 +247,16 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = postbuild")
 		p.w("")
 	end
+end
+
+local function compilation_rules(cfg, toolset, toolset_name, pch)
+	---------------------------------------------------- figure out toolset executables
+	local cc, cxx, ar, link, rc = getToolsetExecutables(cfg, toolset, toolset_name)
+
+	local all_cflags = getcflags(toolset, cfg)
+	local all_cxxflags = getcxxflags(toolset, cfg)
+	local all_ldflags = getldflags(toolset, cfg)
+
 	if toolset_name == "msc" then
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
 		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
@@ -275,13 +271,13 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
 		p.w("")
-		p.w("rule ar")
-		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
-		p.w("  description = ar $out")
-		p.w("")
 		p.w("rule rc")
 		p.w("  command = " .. rc .. " /nologo /fo$out $in")
 		p.w("  description = rc $out")
+		p.w("")
+		p.w("rule ar")
+		p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
+		p.w("  description = ar $out")
 		p.w("")
 		p.w("rule link")
 		p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
@@ -348,40 +344,27 @@ function ninja.generateProjectCfg(cfg)
 		p.w("  description = link $out")
 		p.w("")
 	end
+end
+
+local function custom_command_rule()
 	p.w("rule custom_command")
 	p.w("  command = $CUSTOM_COMMAND")
 	p.w("  description = $CUSTOM_DESCRIPTION")
 	p.w("")
+end
 
-	---------------------------------------------------- build all files
-	p.w("# build files")
-	local intermediateExt = function(cfg, var)
-		if (var == "c") or (var == "cxx") then
-			return iif(toolset_name == "msc", ".obj", ".o")
-		elseif var == "res" then
-			-- TODO
-			return ".res"
-		elseif var == "link" then
-			return cfg.targetextension
-		end
-	end
-	local pch_dependency = ""
-	if pch and toolset_name ~= "msc" then
-		pch_dependency = " | " .. pch .. ".gch"
-		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
-	end
-
+local function collect_generated_files(prj, cfg)
 	local generated_files = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
-		function collect_generated_files(cfg, filecfg)
-			local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
+		function append_to_generated_files(filecfg)
+			local output = project.getrelative(prj, filecfg.buildoutputs[1])
 			table.insert(generated_files, p.esc(output))
 		end
 		local filecfg = fileconfig.getconfig(node, cfg)
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			collect_generated_files(cfg, filecfg)
+			append_to_generated_files(filecfg)
 		elseif rule then
 			local environ = table.shallowcopy(filecfg.environ)
 
@@ -390,11 +373,129 @@ function ninja.generateProjectCfg(cfg)
 				p.rule.prepareEnvironment(rule, environ, filecfg)
 			end
 			local rulecfg = p.context.extent(rule, environ)
-			collect_generated_files(cfg, rulecfg)
+			append_to_generated_files(rulecfg)
 		end
 	end,
 	}, false, 1)
-	
+	return generated_files
+end
+
+local function pch_build(pch, toolset_name)
+	local pch_dependency = ""
+	if pch and toolset_name ~= "msc" then
+		pch_dependency = " | " .. pch .. ".gch"
+		p.w("build " .. p.esc(pch) .. ".gch: build_pch " .. p.esc(pch))
+	end
+	return pch_dependency
+end
+
+local function custom_command_build(cfg, filecfg, filename, file_dependencies)
+	local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
+	local inputs = ""
+	if #filecfg.buildinputs > 0 then
+		inputs = table.implode(filecfg.buildinputs," ","","")
+	end
+
+	local commands = {}
+	if filecfg.buildmessage then
+		commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, prj.basedir, prj.location)}
+	end
+	commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, prj.basedir, prj.location))
+	if (#commands > 1) then
+		commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
+	else
+		commands = commands[1]
+	end
+
+	p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies))
+	p.w("  CUSTOM_COMMAND = " .. commands)
+	p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
+end
+
+local function files_build(prj, cfg, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
+	local objfiles = {}
+	tree.traverse(project.getsourcetree(prj), {
+	onleaf = function(node, depth)
+		local filecfg = fileconfig.getconfig(node, cfg)
+		local rule = p.global.getRuleForFile(node.name, prj.rules)
+		if fileconfig.hasCustomBuildRule(filecfg) then
+			custom_command_build(cfg, filecfg, node.relpath, file_dependencies)
+		elseif rule then
+			local environ = table.shallowcopy(filecfg.environ)
+
+			if rule.propertydefinition then
+				p.rule.prepareEnvironment(rule, environ, cfg)
+				p.rule.prepareEnvironment(rule, environ, filecfg)
+			end
+			local rulecfg = p.context.extent(rule, environ)
+			custom_command_build(cfg, rulecfg, node.relpath, file_dependencies)
+		elseif shouldcompileasc(filecfg) then
+			local objfilename = obj_dir .. "/" .. node.objname .. iif(toolset_name == "msc", ".obj", ".o")
+			objfiles[#objfiles + 1] = objfilename
+			p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
+		elseif shouldcompileascpp(filecfg) then
+			local objfilename = obj_dir .. "/" .. node.objname .. iif(toolset_name == "msc", ".obj", ".o")
+			objfiles[#objfiles + 1] = objfilename
+			p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
+		elseif path.isresourcefile(node.abspath) then
+			local objfilename = obj_dir .. "/" .. node.name .. ".res"
+			objfiles[#objfiles + 1] = objfilename
+			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.relpath))
+		end
+	end,
+	}, false, 1)
+	p.w("")
+
+	return objfiles
+end
+
+local function generated_files_build(generated_files, key)
+	local final_dependency = ""
+	if #generated_files > 0 then
+		p.w("# generated files")
+		p.w("build generated_files_" .. key .. ": phony" .. ninja.list(generated_files))
+		final_dependency = " || generated_files_" .. key
+	end
+	return final_dependency
+end
+
+-- generate project + config build file
+function ninja.generateProjectCfg(cfg)
+	local oldGetDefaultSeparator = path.getDefaultSeparator
+	path.getDefaultSeparator = function() return "/" end
+
+	local prj = cfg.project
+	local key = prj.name .. "_" .. cfg.buildcfg
+	-- TODO why premake doesn't provide default name always ?
+	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
+	local toolset = p.tools[toolset_name]
+
+	p.w("# project build file")
+	p.w("# generated with premake ninja")
+	p.w("")
+
+	-- premake-ninja relies on scoped rules
+	-- and they were added in ninja v1.6
+	p.w("ninja_required_version = 1.6")
+	p.w("")
+
+	---------------------------------------------------- figure out settings
+	local pch = p.tools.gcc.getpch(cfg)
+
+	---------------------------------------------------- write rules
+	p.w("# core rules for " .. cfg.name)
+	prebuild_rule(cfg)
+	postbuild_rule(cfg)
+	compilation_rules(cfg, toolset, toolset_name, pch)
+	custom_command_rule()
+
+	---------------------------------------------------- build all files
+	p.w("# build files")
+
+	local pch_dependency = pch_build(pch, toolset_name)
+
+	local generated_files = collect_generated_files(prj, cfg)
 	local file_dependencies = getFileDependencies(cfg)
 	local regular_file_dependencies = ""
 	if #generated_files > 0 then
@@ -403,67 +504,9 @@ function ninja.generateProjectCfg(cfg)
 		regular_file_dependencies = " ||" .. ninja.list(file_dependencies)
 	end
 
-	local objfiles = {}
-	tree.traverse(project.getsourcetree(prj), {
-	onleaf = function(node, depth)
-		function add_custom_rule(cfg, filecfg, filename)
-			local output = project.getrelative(cfg.project, filecfg.buildoutputs[1])
-			local inputs = ""
-			if #filecfg.buildinputs > 0 then
-				inputs = table.implode(filecfg.buildinputs," ","","")
-			end
-
-			local commands = {}
-			if filecfg.buildmessage then
-				commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, cfg.project.basedir, cfg.project.location)}
-			end
-			commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, cfg.project.basedir, cfg.project.location))
-			if (#commands > 1) then
-				commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
-			else
-				commands = commands[1]
-			end
-
-			p.w("build " .. p.esc(output) .. ": custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies))
-			p.w("  CUSTOM_COMMAND = " .. commands)
-			p.w("  CUSTOM_DESCRIPTION = custom build " .. p.esc(output))
-		end
-		local filecfg = fileconfig.getconfig(node, cfg)
-		local rule = p.global.getRuleForFile(node.name, prj.rules)
-		if fileconfig.hasCustomBuildRule(filecfg) then
-			add_custom_rule(cfg, filecfg, node.relpath)
-		elseif rule then
-			local environ = table.shallowcopy(filecfg.environ)
-
-			if rule.propertydefinition then
-				p.rule.prepareEnvironment(rule, environ, cfg)
-				p.rule.prepareEnvironment(rule, environ, filecfg)
-			end
-			local rulecfg = p.context.extent(rule, environ)
-			add_custom_rule(cfg, rulecfg, node.relpath)
-		elseif shouldcompileasc(filecfg) then
-			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": cc " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-		elseif shouldcompileascpp(filecfg) then
-			objfilename = obj_dir .. "/" .. node.objname .. intermediateExt(cfg, "cxx")
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": cxx " .. p.esc(node.relpath) .. pch_dependency .. regular_file_dependencies)
-		elseif path.isresourcefile(node.abspath) then
-			objfilename = obj_dir .. "/" .. node.name .. intermediateExt(cfg, "res")
-			objfiles[#objfiles + 1] = objfilename
-			p.w("build " .. p.esc(objfilename) .. ": rc " .. p.esc(node.relpath))
-		end
-	end,
-	}, false, 1)
-	p.w("")
-
-	local final_dependency = ""
-	if #generated_files > 0 then
-		p.w("# generated files")
-		p.w("build generated_files_" .. key .. ": phony" .. ninja.list(generated_files))
-		final_dependency = " || generated_files_" .. key
-	end
+	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
+	local objfiles = files_build(prj, cfg, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+	local final_dependency = generated_files_build(generated_files, key)
 
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
@@ -475,6 +518,9 @@ function ninja.generateProjectCfg(cfg)
 		p.w("build postbuild: run_postbuild | " .. ninja.outputFilename(cfg))
 	end
 
+	-- we don't pass getlinks(cfg) through dependencies
+	-- because system libraries are often not in PATH so ninja can't find them
+	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
 		p.w("build " .. p.esc(ninja.outputFilename(cfg)) .. ": ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
