@@ -30,7 +30,7 @@ local function add_build(cfg, output, extra_outputs, command, args)
 	if cached ~= nil then
 		if extra_outputs == cached.extra_outputs
 			and command == cached.command
-			and table.equals(args, cached.args)
+			and table.equals(args or {}, cached.args or {})
 		then
 			-- custom_command rule is identical for each configuration (contrary to other rules)
 			-- So we can compare extra parameter
@@ -473,7 +473,7 @@ local function pch_build(cfg, pch, toolset_name)
 	local pch_dependency = ""
 	if pch and toolset_name ~= "msc" then
 		pch_dependency = " | " .. pch .. ".gch"
-		add_build(cfg, p.esc(pch).. ".gch", "", "build_pch " .. p.esc(pch))
+		add_build(cfg, p.esc(pch) .. ".gch", "", "build_pch " .. p.esc(pch))
 	end
 	return pch_dependency
 end
