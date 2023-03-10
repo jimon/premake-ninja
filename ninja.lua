@@ -496,7 +496,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		commands = commands[1]
 	end
 
-	add_build(cfg, p.esc(output), "", "custom_command || " .. p.esc(filename) .. inputs .. ninja.list(file_dependencies), 
+	add_build(cfg, p.esc(output), "", "custom_command | " .. p.esc(filename) .. inputs .. iif(#file_dependencies > 0, "||" .. ninja.list(file_dependencies), ""),
 		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. p.esc(output)})
 end
 
