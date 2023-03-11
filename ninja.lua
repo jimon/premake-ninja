@@ -347,9 +347,9 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 	elseif toolset_name == "clang" then
 		local force_include_pch = ""
 		if pch then
-			force_include_pch = " -include " .. p.esc(pch)
+			force_include_pch = " -include " .. p.esc(pch.placeholder)
 			p.w("rule build_pch")
-			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MMD -MF $out.d -c -o $out $in")
 			p.w("  description = build_pch $out")
 			p.w("  depfile = $out.d")
 			p.w("  deps = gcc")
@@ -391,9 +391,9 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 	elseif toolset_name == "gcc" then
 		local force_include_pch = ""
 		if pch then
-			force_include_pch = " -include " .. p.esc(pch)
+			force_include_pch = " -include " .. p.esc(pch.placeholder)
 			p.w("rule build_pch")
-			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags, cxx .. all_cxxflags)  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MMD -MF $out.d -c -o $out $in")
 			p.w("  description = build_pch $out")
 			p.w("  depfile = $out.d")
 			p.w("  deps = gcc")
@@ -469,11 +469,11 @@ local function collect_generated_files(prj, cfg)
 	return generated_files
 end
 
-local function pch_build(cfg, pch, toolset_name)
+local function pch_build(cfg, pch)
 	local pch_dependency = ""
-	if pch and toolset_name ~= "msc" then
-		pch_dependency = " | " .. pch .. ".gch"
-		add_build(cfg, p.esc(pch) .. ".gch", "", "build_pch " .. p.esc(pch))
+	if pch then
+		pch_dependency = " | " .. pch.gch
+		add_build(cfg, p.esc(pch.gch), "", "build_pch " .. p.esc(pch.input))
 	end
 	return pch_dependency
 end
@@ -585,7 +585,17 @@ function ninja.generateProjectCfg(cfg)
 	p.w("")
 
 	---------------------------------------------------- figure out settings
-	local pch = p.tools.gcc.getpch(cfg)
+	local pch = nil
+	if toolset_name ~= "msc" then
+		pch = p.tools.gcc.getpch(cfg)
+		if pch then
+			pch = {
+				input = pch,
+				placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
+				gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. ".gch"))
+			}
+		end
+	end
 
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
@@ -597,7 +607,7 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build all files
 	p.w("# build files")
 
-	local pch_dependency = pch_build(cfg, pch, toolset_name)
+	local pch_dependency = pch_build(cfg, pch)
 
 	local generated_files = collect_generated_files(prj, cfg)
 	local file_dependencies = getFileDependencies(cfg)
