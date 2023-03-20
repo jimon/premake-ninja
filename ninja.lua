@@ -46,13 +46,13 @@ local function add_build(cfg, output, extra_outputs, command, args)
 			p.warn(cached.cfg_key .. " and " .. cfg_key .. " both generate differently " .. output .. ". Ignoring " .. cfg_key)
 			p.w("# ERROR: Rule ignored, using the one from " .. cached.cfg_key)
 		end
-		p.w("# build " .. output .. ": " .. command)
+		p.w("# build " .. output .. extra_outputs .. ": " .. command)
 		for i, arg in ipairs(args or {}) do
 			p.w("#   " .. arg)
 		end
 		return
 	end
-	p.w("build " .. output .. ": " .. command)
+	p.w("build " .. output .. extra_outputs .. ": " .. command)
 	for i, arg in ipairs(args or {}) do
 		p.w("  " .. arg)
 	end
@@ -479,12 +479,17 @@ local function pch_build(cfg, pch)
 end
 
 local function custom_command_build(prj, cfg, filecfg, filename, file_dependencies)
-	local output = project.getrelative(prj, filecfg.buildoutputs[1])
+	local outputs = project.getrelative(prj, filecfg.buildoutputs)
+	local output = outputs[1]
+	table.remove(outputs, 1)
 	local inputs = ""
 	if #filecfg.buildinputs > 0 then
-		inputs = table.implode(filecfg.buildinputs," ","","")
+		inputs = table.implode(project.getrelative(prj, filecfg.buildinputs)," ","","")
 	end
-
+	local extra_outputs = ""
+	if #outputs > 0 then
+		extra_outputs = " |" .. ninja.list(outputs)
+	end
 	local commands = {}
 	if filecfg.buildmessage then
 		commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, prj.basedir, prj.location)}
@@ -496,7 +501,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		commands = commands[1]
 	end
 
-	add_build(cfg, p.esc(output), "", "custom_command | " .. p.esc(filename) .. inputs .. iif(#file_dependencies > 0, "||" .. ninja.list(file_dependencies), ""),
+	add_build(cfg, p.esc(output), extra_outputs, "custom_command | " .. p.esc(filename) .. inputs .. iif(#file_dependencies > 0, "||" .. ninja.list(file_dependencies), ""),
 		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. p.esc(output)})
 end
 
