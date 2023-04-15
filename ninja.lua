@@ -421,8 +421,10 @@ local function collect_generated_files(prj, cfg)
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		function append_to_generated_files(filecfg)
-			local output = project.getrelative(prj, filecfg.buildoutputs[1])
-			table.insert(generated_files, p.esc(output))
+			local outputs = project.getrelative(prj, filecfg.buildoutputs)
+			for _, output in ipairs(outputs) do
+				table.insert(generated_files, p.esc(output))
+			end
 		end
 		local filecfg = fileconfig.getconfig(node, cfg)
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
