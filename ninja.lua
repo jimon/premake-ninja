@@ -309,23 +309,15 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
 		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
 
+		p.w("CFLAGS=" .. all_cflags)
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. " /nologo /showIncludes -c $in /Fo$out")
+		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cc $out")
 		p.w("  deps = msvc")
 		p.w("")
+		p.w("CXXFLAGS=" .. all_cxxflags)
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. " /nologo /showIncludes -c $in /Fo$out")
-		p.w("  description = cxx $out")
-		p.w("  deps = msvc")
-		p.w("")
-		p.w("rule cc_flags")
-		p.w("  command = " .. cc .. all_cflags .. " $CFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
-		p.w("  description = cc $out")
-		p.w("  deps = msvc")
-		p.w("")
-		p.w("rule cxx_flags")
-		p.w("  command = " .. cxx .. all_cxxflags .. " $CXXFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c $in /Fo$out")
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
 		p.w("")
@@ -354,26 +346,16 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 			p.w("  depfile = $out.d")
 			p.w("  deps = gcc")
 		end
+		p.w("CFLAGS=" .. all_cflags)
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
+		p.w("CXXFLAGS=" .. all_cxxflags)
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cxx $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("rule cc_flags")
-		p.w("  command = " .. cc .. all_cflags .. " $CFLAGS".. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cc $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("rule cxx_flags")
-		p.w("  command = " .. cxx .. all_cxxflags .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -399,26 +381,16 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 			p.w("  depfile = $out.d")
 			p.w("  deps = gcc")
 		end
+		p.w("CFLAGS=" .. all_cflags)
 		p.w("rule cc")
-		p.w("  command = " .. cc .. all_cflags .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cc $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
+		p.w("CXXFLAGS=" .. all_cxxflags)
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. all_cxxflags .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cxx $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("rule cc_flags")
-		p.w("  command = " .. cc .. all_cflags .. " $CFLAGS".. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cc $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("rule cxx_flags")
-		p.w("  command = " .. cxx .. all_cxxflags .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
@@ -516,17 +488,17 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		objfiles[#objfiles + 1] = objfilename
 		local cflags = {}
 		if has_custom_settings then
-			cflags = {"CFLAGS = " .. getcflags(toolset, cfg, filecfg)}
+			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, p.esc(objfilename), "", iif(has_custom_settings, "cc_flags ", "cc ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cflags)
+		add_build(cfg, p.esc(objfilename), "", "cc " .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
 		objfiles[#objfiles + 1] = objfilename
 		local cxxflags = {}
 		if has_custom_settings then
-			cxxflags = {"CXXFLAGS = " .. getcxxflags(toolset, cfg, filecfg)}
+			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, p.esc(objfilename), "", iif(has_custom_settings, "cxx_flags ", "cxx ") .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cxxflags)
+		add_build(cfg, p.esc(objfilename), "", "cxx " .. p.esc(filecfg.relpath) .. pch_dependency .. regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
