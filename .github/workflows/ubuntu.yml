@@ -1,0 +1,54 @@
+name: ubuntu
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ubuntu.yml'
+      - 'tests/**'
+      - '**/*.lua'
+
+  pull_request:
+    paths:
+      - '.github/workflows/ubuntu.yml'
+      - 'tests/**'
+      - '**/*.lua'
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: checkout premake5
+      uses: actions/checkout@v3
+      with:
+          repository: premake/premake-core
+          path: .bins/premake-build
+
+    - name: Build premake5
+      run: |
+        cd .bins/premake-build
+        make -f Bootstrap.mak linux CONFIG=release
+        cp bin/release/premake5 ../
+        cd ..
+        rm -Rf premake-build
+
+    - name: apt-get update
+      run: sudo apt-get update -y
+
+    - name: apt-get install ninja-build
+      run: |
+        sudo apt-get install -y ninja-build
+
+    - name: Versions
+      run: |
+        python --version
+        .bins/premake5 --version
+        ninja --version
+
+    - name: test projects
+      run: cd tests && PATH=$PATH:`pwd`/../.bins python run_tests.py
+

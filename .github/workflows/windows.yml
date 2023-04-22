@@ -1,0 +1,47 @@
+name: windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'tests/**'
+      - '**/*.lua'
+
+  pull_request:
+    paths:
+      - '.github/workflows/windows.yml'
+      - 'tests/**'
+      - '**/*.lua'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: checkout premake5
+      uses: actions/checkout@v3
+      with:
+          repository: premake/premake-core
+          path: .bins/premake-build
+
+    - name: Build premake5
+      run: |
+        $vcvarall_path = vswhere -find VC\Auxiliary\Build\vcvarsall.bat
+        cmd.exe /c "call ""$vcvarall_path"" x86_amd64 && cd .bins/premake-build && nmake -f Bootstrap.mak MSDEV=vs2022 windows-msbuild PLATFORM=Win32 CONFIG=release && cp bin/release/premake5.exe ../"
+
+    - name: install ninja
+      uses: seanmiddleditch/gha-setup-ninja@v3
+
+    - name: Versions
+      run: |
+        python --version
+        .bins/premake5 --version
+        ninja --version
+
+    - name: test projects
+      run: cd tests && PATH=$PATH:`pwd`/../.bins python run_tests.py
+      shell: bash
