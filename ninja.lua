@@ -119,7 +119,7 @@ function ninja.generateWorkspace(wks)
 				key = prj.name .. "_" .. cfg.buildcfg
 
 				if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
-
+				key = p.esc(key)
 				if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = "" end
 				cfgs[cfg.buildcfg] = cfgs[cfg.buildcfg] .. key .. " "
 
