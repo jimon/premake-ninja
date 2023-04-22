@@ -539,7 +539,7 @@ local function generated_files_build(cfg, generated_files, key)
 	local final_dependency = ""
 	if #generated_files > 0 then
 		p.w("# generated files")
-		add_build(cfg, "generated_files_" .. key, "", "phony" .. ninja.list(generated_files))
+		add_build(cfg, p.esc("generated_files_" .. key), "", "phony" .. ninja.list(generated_files))
 		final_dependency = " || generated_files_" .. key
 	end
 	return final_dependency
@@ -606,11 +606,11 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		p.w("# prebuild")
-		add_build(cfg, "prebuild_" .. get_key(cfg), "", "run_prebuild")
+		add_build(cfg, p.esc("prebuild_" .. get_key(cfg)), "", "run_prebuild")
 	end
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		p.w("# postbuild")
-		add_build(cfg, "postbuild_" .. get_key(cfg), "", "run_postbuild | " .. ninja.outputFilename(cfg))
+		add_build(cfg, p.esc("postbuild_" .. get_key(cfg)), "", "run_postbuild | " .. p.esc(ninja.outputFilename(cfg)))
 	end
 
 	-- we don't pass getlinks(cfg) through dependencies
@@ -647,9 +647,9 @@ function ninja.generateProjectCfg(cfg)
 
 	p.w("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
-		add_build(cfg, key, "", "phony postbuild_" .. get_key(cfg))
+		add_build(cfg, p.esc(key), "", "phony postbuild_" .. get_key(cfg))
 	else
-		add_build(cfg, key, "", "phony " .. ninja.outputFilename(cfg))
+		add_build(cfg, p.esc(key), "", "phony " .. p.esc(ninja.outputFilename(cfg)))
 	end
 	p.w("")
 
