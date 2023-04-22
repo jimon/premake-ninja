@@ -102,13 +102,30 @@ class Helper(unittest.TestCase):
 			prefix = ""
 		if ext == None:
 			ext = base_name_and_ext[1]
-		return base_path + "/" + prefix +base_name_and_ext[0] + ext
+		return base_path + "/" + prefix + base_name_and_ext[0] + ext
 
 	# check if executable exist
 	def out_exist(self, path):
+		print("Looking for {} in {}", path, os.listdir(os.path.dirname(path)))
+		sys.stdout.flush()
 		self.assertTrue(
 			os.path.exists(path) or
 			os.path.exists(self.out_name(path, ".exe")) or
+			os.path.exists(self.out_name(path, ".app")) or
+			os.path.exists(self.out_name(path, ".lib")) or
+			os.path.exists(self.out_name(path, ".a", "lib")) or
+			os.path.exists(self.out_name(path, ".dll")) or
+			os.path.exists(self.out_name(path, ".so", "lib")) or
+			os.path.exists(self.out_name(path, ".dylib", "lib"))
+		)
+		print("Found {}", path)
+		sys.stdout.flush()
+	# check if executable doesn't exist
+	def out_not_exist(self, path):
+		self.assertFalse(
+			os.path.exists(path) or
+			os.path.exists(self.out_name(path, ".exe")) or
+			os.path.exists(self.out_name(path, ".app")) or
 			os.path.exists(self.out_name(path, ".lib")) or
 			os.path.exists(self.out_name(path, ".a", "lib")) or
 			os.path.exists(self.out_name(path, ".dll")) or
@@ -116,27 +133,18 @@ class Helper(unittest.TestCase):
 			os.path.exists(self.out_name(path, ".dylib", "lib"))
 		)
 
-	# check if executable doesn't exist
-	def out_not_exist(self, path):
-		self.assertFalse(
-			 os.path.exists(path) or
-			 os.path.exists(self.out_name(path, ".exe")) or
-			 os.path.exists(self.out_name(path, ".lib")) or
-			 os.path.exists(self.out_name(path, ".a", "lib")) or
-			 os.path.exists(self.out_name(path, ".dll")) or
-			 os.path.exists(self.out_name(path, ".so", "lib")) or
-			 os.path.exists(self.out_name(path, ".dylib", "lib"))
-		)
-
 	# check if executable exist
 	def exe(self, path):
 		if os.path.exists(path):
 			current_cwd = os.getcwd()
 			os.chdir(self.build_dir)
-			subprocess.check_call([os.path.relpath(path, self.build_dir)])
+			executable = os.path.relpath(path, self.build_dir)
+			subprocess.check_call([executable], env={'LD_LIBRARY_PATH': os.path.dirname(executable), 'DYLD_LIBRARY_PATH': os.path.dirname(executable)})
 			os.chdir(current_cwd)
 		elif os.path.exists(path + ".exe"):
 			subprocess.check_call([path + ".exe"])
+		elif os.path.exists(path + ".app"):
+			subprocess.check_call([path + ".app"])
 		elif os.path.exists(self.out_name(path, ".lib")) or os.path.exists(self.out_name(path, ".a", "lib")) or os.path.exists(self.out_name(path, ".dll")) or os.path.exists(self.out_name(path, ".so", "lib")) or os.path.exists(self.out_name(path, ".dylib", "lib")):
 			pass
 		else:
