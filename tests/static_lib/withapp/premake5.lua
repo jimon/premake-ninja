@@ -14,16 +14,16 @@ project "ninjatestprj_app"
 	includedirs {"test1", "test2"}
 	links {"ninjatestprj_lib test1", "ninjatestprj_lib_test2"}
 
-	configuration "windows"
+	filter {"system:windows"}
 		links { "user32", "gdi32" }
 
-	configuration "linux"
+	filter {"system:linux"}
 		links { "pthread" }
 	-- todo add system libs for os x and linux
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}
@@ -40,7 +40,7 @@ project "ninjatestprj_lib test1"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}
@@ -57,7 +57,7 @@ project "ninjatestprj_lib_test2"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}

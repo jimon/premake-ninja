@@ -15,7 +15,7 @@ project "ninjatestprj"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}

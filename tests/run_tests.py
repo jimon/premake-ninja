@@ -196,7 +196,7 @@ class TestStaticLib(Helper):
 		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
 		self.exit_test()
 
-	# test staic lib with app
+	# test static lib with app
 	def test_withapp(self):
 		self.enter_test("static_lib/withapp")
 		self.check_basics("build/bin_debug/ninjatestprj_app", "build/bin_release/ninjatestprj_app")

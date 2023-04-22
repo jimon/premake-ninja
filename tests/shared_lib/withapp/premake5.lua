@@ -16,7 +16,7 @@ project "ninjatestprj_app"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}
@@ -34,7 +34,7 @@ project "ninjatestprj_lib_test1"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}
@@ -52,7 +52,7 @@ project "ninjatestprj_lib_test2"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}

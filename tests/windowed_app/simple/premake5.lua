@@ -13,11 +13,11 @@ project "ninjatestprj"
 	files {"**.cpp", "**.c", "**.h"}
 
 	filter "system:windows"
-		flags {"WinMain"}
+		entrypoint "WinMainCRTStartup"
 
 	filter "configurations:debug"
 		defines {"DEBUG"}
-		flags {"Symbols"}
+		symbols "On"
 
 	filter "configurations:release"
 		defines {"NDEBUG"}
