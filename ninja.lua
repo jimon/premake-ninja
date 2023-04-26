@@ -278,6 +278,25 @@ local function prebuild_rule(cfg)
 	end
 end
 
+local function prelink_rule(cfg)
+	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
+		local commands = {}
+		if cfg.prelinkmessage then
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prelinkmessage, cfg.project.basedir, cfg.project.location)}
+		end
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prelinkcommands, cfg.project.basedir, cfg.project.location))
+		if (#commands > 1) then
+			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
+		else
+			commands = commands[1]
+		end
+		p.w("rule run_prelink")
+		p.w("  command = " .. p.esc(commands))
+		p.w("  description = prelink")
+		p.w("")
+	end
+end
+
 local function postbuild_rule(cfg)
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		local commands = {}
@@ -581,6 +600,7 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- write rules
 	p.w("# core rules for " .. cfg.name)
 	prebuild_rule(cfg)
+	prelink_rule(cfg)
 	postbuild_rule(cfg)
 	compilation_rules(cfg, toolset, toolset_name, pch)
 	custom_command_rule()
@@ -608,6 +628,12 @@ function ninja.generateProjectCfg(cfg)
 		p.w("# prebuild")
 		add_build(cfg, p.esc("prebuild_" .. get_key(cfg)), "", "run_prebuild")
 	end
+	local prelink_dependency = ""
+	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
+		p.w("# prelink")
+		add_build(cfg, p.esc("prelink_" .. get_key(cfg)), "", "run_prelink | " .. table.concat(p.esc(objfiles), " ") .. final_dependency)
+		prelink_dependency = iif(#final_dependency == 0, ' || ', ' ') .. p.esc("prelink_" .. get_key(cfg))
+	end
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		p.w("# postbuild")
 		add_build(cfg, p.esc("postbuild_" .. get_key(cfg)), "", "run_postbuild | " .. p.esc(ninja.outputFilename(cfg)))
@@ -618,7 +644,7 @@ function ninja.generateProjectCfg(cfg)
 	local libs = ninja.list(p.esc(config.getlinks(cfg, "siblings", "fullpath")))
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
-		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "ar " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency .. prelink_dependency)
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
@@ -635,11 +661,11 @@ function ninja.generateProjectCfg(cfg)
 			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
 		end
 
-		add_build(cfg, p.esc(output), extra_output, "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(output), extra_output, "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency .. prelink_dependency)
 
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.w("# link executable")
-		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency)
+		add_build(cfg, p.esc(ninja.outputFilename(cfg)), "", "link " .. table.concat(p.esc(objfiles), " ") .. libs .. final_dependency .. prelink_dependency)
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
