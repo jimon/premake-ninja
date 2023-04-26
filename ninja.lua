@@ -654,7 +654,7 @@ function ninja.generateProjectCfg(cfg)
 		if ninja.endsWith(output, ".dll") then
 			extra_output = " | " .. p.esc(ninja.noext(output, ".dll")) .. ".lib" .. " " .. p.esc(ninja.noext(output, ".dll")) .. ".exp"
 		elseif ninja.endsWith(output, ".so") then
-			extra_output = " | " .. p.esc(ninja.noext(output, ".so")) .. ".a"
+			-- in case of .so there are no corresponding .a file
 		elseif ninja.endsWith(output, ".dylib") then
 			-- in case of .dylib there are no corresponding .a file
 		else
