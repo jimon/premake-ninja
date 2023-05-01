@@ -26,19 +26,16 @@
 		onWorkspace = function(wks)
 			p.eol("\r\n")
 			p.indent("  ")
-			p.escaper(p.modules.ninja.esc)
 			p.generate(wks, "build.ninja", p.modules.ninja.generateWorkspace)
 		end,
 		onProject = function(prj)
 			p.eol("\r\n")
 			p.indent("  ")
-			p.escaper(p.modules.ninja.esc)
 			p.modules.ninja.generateProject(prj)
 		end,
 		onBranch = function(prj)
 			p.eol("\r\n")
 			p.indent("  ")
-			p.escaper(p.modules.ninja.esc)
 			p.modules.ninja.generateProject(prj)
 		end,
 		onCleanSolution = function(sln)
