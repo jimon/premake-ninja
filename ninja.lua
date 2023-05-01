@@ -284,9 +284,9 @@ local function prebuild_rule(cfg)
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		local commands = {}
 		if cfg.prebuildmessage then
-			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prebuildmessage, cfg.project.basedir, cfg.project.location)}
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prebuildmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.project.basedir, cfg.project.location))
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
@@ -303,9 +303,9 @@ local function prelink_rule(cfg)
 	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
 		local commands = {}
 		if cfg.prelinkmessage then
-			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prelinkmessage, cfg.project.basedir, cfg.project.location)}
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prelinkmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prelinkcommands, cfg.project.basedir, cfg.project.location))
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prelinkcommands, cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
@@ -322,9 +322,9 @@ local function postbuild_rule(cfg)
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		local commands = {}
 		if cfg.postbuildmessage then
-			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.postbuildmessage, cfg.project.basedir, cfg.project.location)}
+			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.postbuildmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.project.basedir, cfg.project.location))
+		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
@@ -461,7 +461,7 @@ local function collect_generated_files(prj, cfg)
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		function append_to_generated_files(filecfg)
-			local outputs = project.getrelative(prj, filecfg.buildoutputs)
+			local outputs = project.getrelative(prj.workspace, filecfg.buildoutputs)
 			generated_files = table.join(generated_files, outputs)
 		end
 		local filecfg = fileconfig.getconfig(node, cfg)
@@ -493,14 +493,14 @@ local function pch_build(cfg, pch)
 end
 
 local function custom_command_build(prj, cfg, filecfg, filename, file_dependencies)
-	local outputs = project.getrelative(prj, filecfg.buildoutputs)
+	local outputs = project.getrelative(prj.workspace, filecfg.buildoutputs)
 	local output = outputs[1]
 	table.remove(outputs, 1)
 	local commands = {}
 	if filecfg.buildmessage then
-		commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, prj.basedir, prj.location)}
+		commands = {os.translateCommandsAndPaths("{ECHO} " .. filecfg.buildmessage, prj.workspace.basedir, prj.workspace.location)}
 	end
-	commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, prj.basedir, prj.location))
+	commands = table.join(commands, os.translateCommandsAndPaths(filecfg.buildcommands, prj.workspace.basedir, prj.workspace.location))
 	if (#commands > 1) then
 		commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 	else
@@ -513,6 +513,7 @@ end
 
 local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
+	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 
 	if shouldcompileasc(filecfg) then
@@ -522,7 +523,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, "cc", {filecfg.relpath}, pch_dependency, regular_file_dependencies, cflags)
+		add_build(cfg, objfilename, {}, "cc", {filepath}, pch_dependency, regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
 		objfiles[#objfiles + 1] = objfilename
@@ -530,11 +531,11 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, "cxx", {filecfg.relpath}, pch_dependency, regular_file_dependencies, cxxflags)
+		add_build(cfg, objfilename, {}, "cxx", {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
-		add_build(cfg, objfilename, {}, "rc", {filecfg.relpath}, {}, {}, {})
+		add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, {})
 	end
 end
 
@@ -544,8 +545,10 @@ local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regu
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
+		local filepath = project.getrelative(cfg.workspace, node.abspath)
+
 		if fileconfig.hasCustomBuildRule(filecfg) then
-			custom_command_build(prj, cfg, filecfg, node.relpath, file_dependencies)
+			custom_command_build(prj, cfg, filecfg, filepath, file_dependencies)
 		elseif rule then
 			local environ = table.shallowcopy(filecfg.environ)
 
@@ -554,7 +557,7 @@ local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regu
 				p.rule.prepareEnvironment(rule, environ, filecfg)
 			end
 			local rulecfg = p.context.extent(rule, environ)
-			custom_command_build(prj, cfg, rulecfg, node.relpath, file_dependencies)
+			custom_command_build(prj, cfg, rulecfg, filepath, file_dependencies)
 		else
 			compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
 		end
@@ -647,7 +650,7 @@ function ninja.generateProjectCfg(cfg)
 
 	-- we don't pass getlinks(cfg) through dependencies
 	-- because system libraries are often not in PATH so ninja can't find them
-	local libs = config.getlinks(cfg, "siblings", "fullpath")
+	local libs = table.translate(config.getlinks(cfg, "siblings", "fullpath"), function (p) return project.getrelative(cfg.workspace, path.join(cfg.project.location, p)) end)
 	if cfg.kind == p.STATICLIB then
 		p.w("# link static lib")
 		add_build(cfg, ninja.outputFilename(cfg), {}, "ar", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency))
