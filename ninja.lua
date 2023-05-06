@@ -151,6 +151,9 @@ function ninja.generateWorkspace(wks)
 				if (cfg_first_lib == nil) and (cfg.kind == p.STATICLIB or cfg.kind == p.SHAREDLIB) then
 					cfg_first_lib = key
 				end
+				if prj.name == wks.startproject then
+					cfg_first = key
+				end
 
 				-- include other ninja file
 				p.w("subninja " .. ninja.esc(ninja.projectCfgFilename(cfg, true)))
