@@ -12,6 +12,17 @@ local project = p.project
 local config = p.config
 local fileconfig = p.fileconfig
 
+-- Some toolset fixes/helper
+p.tools.clang.objectextension = ".o"
+p.tools.gcc.objectextension = ".o"
+p.tools.msc.objectextension = ".obj"
+
+p.tools.msc.gettoolname = function(cfg, name)
+	local map = {cc = "cl", cxx = "cl", ar = "lib", rc = "rc"}
+	return map[name]
+end
+
+-- Ninja module
 premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
@@ -215,32 +226,6 @@ local function getDefaultToolsetFromOs()
 	end
 end
 
-local function getToolsetExecutables(cfg, toolset, toolset_name)
-	local cc = ""
-	local cxx = ""
-	local ar = ""
-	local link = ""
-	local rc = ""
-
-	if toolset_name == "msc" then
-		-- TODO premake doesn't set tools names for msc, do we want to fix it ?
-		cc = "cl"
-		cxx = "cl"
-		ar = "lib"
-		link = "cl"
-		rc = "rc"
-	elseif toolset_name == "clang" or toolset_name == "gcc" then
-		if not cfg.gccprefix then cfg.gccprefix = "" end
-		cc = toolset.gettoolname(cfg, "cc")
-		cxx = toolset.gettoolname(cfg, "cxx")
-		ar = toolset.gettoolname(cfg, "ar")
-		link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
-	else
-		p.error("unknown toolchain " .. toolset_name)
-	end
-	return cc, cxx, ar, link, rc
-end
-
 local function getFileDependencies(cfg)
 	local dependencies = {}
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
@@ -277,7 +262,7 @@ local function getldflags(toolset, cfg)
 	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
 
 	-- experimental feature, change install_name of shared libs
-	--if (toolset_name == "clang") and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
+	--if (toolset == p.tools.clang) and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
 	return ldflags
@@ -340,15 +325,19 @@ local function postbuild_rule(cfg)
 	end
 end
 
-local function compilation_rules(cfg, toolset, toolset_name, pch)
+local function compilation_rules(cfg, toolset, pch)
 	---------------------------------------------------- figure out toolset executables
-	local cc, cxx, ar, link, rc = getToolsetExecutables(cfg, toolset, toolset_name)
+	local cc = toolset.gettoolname(cfg, "cc")
+	local cxx = toolset.gettoolname(cfg, "cxx")
+	local ar = toolset.gettoolname(cfg, "ar")
+	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
+	local rc = toolset.gettoolname(cfg, "rc")
 
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
 	local all_ldflags = getldflags(toolset, cfg)
 
-	if toolset_name == "msc" then
+	if toolset == p.tools.msc then
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
 		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
 
@@ -379,7 +368,7 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 			p.w("  description = link $out")
 			p.w("")
 		end
-	elseif toolset_name == "clang" then
+	elseif toolset == p.tools.clang then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
@@ -414,7 +403,7 @@ local function compilation_rules(cfg, toolset, toolset_name, pch)
 			p.w("  description = link $out")
 			p.w("")
 		end
-	elseif toolset_name == "gcc" then
+	elseif toolset == p.tools.gcc then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
@@ -520,7 +509,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 
 	if shouldcompileasc(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
+		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
 		local cflags = {}
 		if has_custom_settings then
@@ -528,7 +517,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		end
 		add_build(cfg, objfilename, {}, "cc", {filepath}, pch_dependency, regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. iif(toolset_name == "msc", ".obj", ".o")
+		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
 		local cxxflags = {}
 		if has_custom_settings then
@@ -542,7 +531,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	end
 end
 
-local function files_build(prj, cfg, toolset, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+local function files_build(prj, cfg, toolset, pch_dependency, regular_file_dependencies, file_dependencies)
 	local objfiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
@@ -590,7 +579,14 @@ function ninja.generateProjectCfg(cfg)
 	local key = prj.name .. "_" .. cfg.buildcfg
 	-- TODO why premake doesn't provide default name always ?
 	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
-	local toolset = p.tools[toolset_name]
+	local toolset, toolset_version = p.tools.canonical(toolset_name)
+
+	if not toolset then
+		p.error("Unknown toolset " .. toolset_name)
+	end
+
+  -- Some toolset fixes
+	cfg.gccprefix = cfg.gccprefix or ""
 
 	p.w("# project build file")
 	p.w("# generated with premake ninja")
@@ -603,7 +599,7 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- figure out settings
 	local pch = nil
-	if toolset_name ~= "msc" then
+	if toolset ~= p.tools.msc then
 		pch = p.tools.gcc.getpch(cfg)
 		if pch then
 			pch = {
@@ -619,7 +615,7 @@ function ninja.generateProjectCfg(cfg)
 	prebuild_rule(cfg)
 	prelink_rule(cfg)
 	postbuild_rule(cfg)
-	compilation_rules(cfg, toolset, toolset_name, pch)
+	compilation_rules(cfg, toolset, pch)
 	custom_command_rule()
 
 	---------------------------------------------------- build all files
@@ -632,7 +628,7 @@ function ninja.generateProjectCfg(cfg)
 	local regular_file_dependencies = table.join(iif(#generated_files > 0, {"generated_files_" .. key}, {}), file_dependencies)
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
-	local objfiles = files_build(prj, cfg, toolset, toolset_name, pch_dependency, regular_file_dependencies, file_dependencies)
+	local objfiles = files_build(prj, cfg, toolset, pch_dependency, regular_file_dependencies, file_dependencies)
 	local final_dependency = generated_files_build(cfg, generated_files, key)
 
 	---------------------------------------------------- build final target
