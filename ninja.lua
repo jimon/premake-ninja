@@ -1,4 +1,4 @@
---
+﻿--
 -- Name:        premake-ninja/ninja.lua
 -- Purpose:     Define the ninja action.
 -- Author:      Dmitry Ivanov
@@ -16,6 +16,8 @@ local fileconfig = p.fileconfig
 p.tools.clang.objectextension = ".o"
 p.tools.gcc.objectextension = ".o"
 p.tools.msc.objectextension = ".obj"
+
+p.tools.clang.tools.rc = p.tools.clang.tools.rc or "windres"
 
 p.tools.msc.gettoolname = function(cfg, name)
 	local map = {cc = "cl", cxx = "cl", ar = "lib", rc = "rc"}
@@ -268,6 +270,14 @@ local function getldflags(toolset, cfg)
 	return ldflags
 end
 
+local function getresflags(toolset, cfg, filecfg)
+	local defines = ninja.list(toolset.getdefines(table.join(filecfg.defines, filecfg.resdefines)))
+	local includes = ninja.list(toolset.getincludedirs(cfg, table.join(filecfg.externalincludedirs, filecfg.includedirsafter, filecfg.includedirs, filecfg.resincludedirs), {}, {}, {}))
+	local options = ninja.list(cfg.resoptions)
+
+	return defines .. includes .. options
+end
+
 local function prebuild_rule(cfg)
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		local commands = {}
@@ -336,6 +346,7 @@ local function compilation_rules(cfg, toolset, pch)
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
 	local all_ldflags = getldflags(toolset, cfg)
+	local all_resflags = getresflags(toolset, cfg, cfg)
 
 	if toolset == p.tools.msc then
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
@@ -353,8 +364,9 @@ local function compilation_rules(cfg, toolset, pch)
 		p.w("  description = cxx $out")
 		p.w("  deps = msvc")
 		p.w("")
+		p.w("RESFLAGS = " .. all_resflags)
 		p.w("rule rc")
-		p.w("  command = " .. rc .. " /nologo /fo$out $in")
+		p.w("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
 		p.w("  description = rc $out")
 		p.w("")
 		if cfg.kind == p.STATICLIB then
@@ -392,6 +404,11 @@ local function compilation_rules(cfg, toolset, pch)
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
 		p.w("")
+		p.w("RESFLAGS = " .. all_resflags)
+		p.w("rule rc")
+		p.w("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
+		p.w("  description = rc $out")
+		p.w("")
 		if cfg.kind == p.STATICLIB then
 			p.w("rule ar")
 			p.w("  command = " .. ar .. " rcs $out $in")
@@ -426,6 +443,11 @@ local function compilation_rules(cfg, toolset, pch)
 		p.w("  description = cxx $out")
 		p.w("  depfile = $out.d")
 		p.w("  deps = gcc")
+		p.w("")
+		p.w("RESFLAGS = " .. all_resflags)
+		p.w("rule rc")
+		p.w("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
+		p.w("  description = rc $out")
 		p.w("")
 		if cfg.kind == p.STATICLIB then
 			p.w("rule ar")
@@ -527,7 +549,11 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
-		add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, {})
+		local resflags = {}
+		if has_custom_settings then
+			resflags = {"RESFLAGS = $RESFLAGS " .. getresflags(toolset, cfg, filecfg)}
+		end
+		add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, resflags)
 	end
 end
 
