@@ -213,21 +213,6 @@ local function shouldcompileascpp(filecfg)
 	return path.iscppfile(filecfg.abspath)
 end
 
-local function getDefaultToolsetFromOs()
-	local system_name = os.target()
-
-	if system_name == "windows" then
-		return "msc"
-	elseif system_name == "macosx" then
-		return "clang"
-	elseif system_name == "linux" then
-		return "gcc"
-	else
-		p.warnOnce("unknown_system", "no toolchain set and unknown system " .. system_name .. " so assuming toolchain is gcc")
-		return "gcc"
-	end
-end
-
 local function getFileDependencies(cfg)
 	local dependencies = {}
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
@@ -603,12 +588,10 @@ function ninja.generateProjectCfg(cfg)
 
 	local prj = cfg.project
 	local key = prj.name .. "_" .. cfg.buildcfg
-	-- TODO why premake doesn't provide default name always ?
-	local toolset_name = _OPTIONS.cc or cfg.toolset or ninja.getDefaultToolsetFromOs()
-	local toolset, toolset_version = p.tools.canonical(toolset_name)
+	local toolset, toolset_version = p.tools.canonical(cfg.toolset)
 
 	if not toolset then
-		p.error("Unknown toolset " .. toolset_name)
+		p.error("Unknown toolset " .. cfg.toolset)
 	end
 
   -- Some toolset fixes

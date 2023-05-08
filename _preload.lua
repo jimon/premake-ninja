@@ -20,7 +20,9 @@
 		valid_languages	= {"C", "C++"},
 		valid_tools		= {cc = { "gcc", "clang", "msc" }},
 
-		toolset = "gcc",
+		toolset = iif(os.target() == "windows", "msc-v142", -- Visual Studio 2019
+							iif(os.target() == "macosx", "clang",
+																					"gcc")),
 
 		-- Workspace and project generation logic
 		onWorkspace = function(wks)
