@@ -547,6 +547,9 @@ local function files_build(prj, cfg, toolset, pch_dependency, regular_file_depen
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
+		if not filecfg then
+			return
+		end
 		local rule = p.global.getRuleForFile(node.name, prj.rules)
 		local filepath = project.getrelative(cfg.workspace, node.abspath)
 
