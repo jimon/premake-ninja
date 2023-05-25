@@ -400,8 +400,9 @@ local function compilation_rules(cfg, toolset, pch)
 			p.w("  description = ar $out")
 			p.w("")
 		else
+			local groups = iif(cfg.linkgroups == premake.ON, {"-Wl,--start-group ", " -Wl,--end-group"}, {"", ""})
 			p.w("rule link")
-			p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
+			p.w("  command = " .. link .. " -o $out " .. groups[1] .. "$in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2])
 			p.w("  description = link $out")
 			p.w("")
 		end
