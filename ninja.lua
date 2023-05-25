@@ -365,47 +365,7 @@ local function compilation_rules(cfg, toolset, pch)
 			p.w("  description = link $out")
 			p.w("")
 		end
-	elseif toolset == p.tools.clang then
-		local force_include_pch = ""
-		if pch then
-			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
-			p.w("rule build_pch")
-			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MMD -MF $out.d -c -o $out $in")
-			p.w("  description = build_pch $out")
-			p.w("  depfile = $out.d")
-			p.w("  deps = gcc")
-		end
-		p.w("CFLAGS=" .. all_cflags)
-		p.w("rule cc")
-		p.w("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cc $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("CXXFLAGS=" .. all_cxxflags)
-		p.w("rule cxx")
-		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cxx $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("RESFLAGS = " .. all_resflags)
-		p.w("rule rc")
-		p.w("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
-		p.w("  description = rc $out")
-		p.w("")
-		if cfg.kind == p.STATICLIB then
-			p.w("rule ar")
-			p.w("  command = " .. ar .. " rcs $out $in")
-			p.w("  description = ar $out")
-			p.w("")
-		else
-			p.w("rule link")
-			p.w("  command = " .. link .. " -o $out $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. all_ldflags)
-			p.w("  description = link $out")
-			p.w("")
-		end
-	elseif toolset == p.tools.gcc then
+	elseif toolset == p.tools.clang or toolset == p.tools.gcc then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
