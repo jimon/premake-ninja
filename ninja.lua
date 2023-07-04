@@ -234,13 +234,13 @@ local function getcflags(toolset, cfg, filecfg)
 
 	local extra = ""
 	if toolset == p.tools.msc then
-		if cfg.cdialect and cfg.cdialect ~= "Default" then
-			extra = extra .. " /std:" .. string.lower(cfg.cdialect)
+		if filecfg.cdialect and filecfg.cdialect ~= "Default" then
+			extra = extra .. " /std:" .. string.lower(filecfg.cdialect)
 		end
-		if cfg.unsignedchar == "On" then
+		if filecfg.unsignedchar == "On" then
 			extra = extra .. " " .. p.tools.msc.shared.unsignedchar["On"]
 		end
-		if cfg.openmp == "On" then
+		if filecfg.openmp == "On" then
 			extra = extra .. " /openmp"
 		end
 	end
@@ -258,13 +258,13 @@ local function getcxxflags(toolset, cfg, filecfg)
 
 	local extra = ""
 	if toolset == p.tools.msc then
-		if cfg.cppdialect and cfg.cppdialect ~= "Default" then
-			extra = extra .. " /std:" .. string.lower(cfg.cppdialect)
+		if filecfg.cppdialect and filecfg.cppdialect ~= "Default" then
+			extra = extra .. " /std:" .. string.lower(filecfg.cppdialect)
 		end
-		if cfg.unsignedchar == "On" then
+		if filecfg.unsignedchar == "On" then
 			extra = extra .. " " .. p.tools.msc.shared.unsignedchar["On"]
 		end
-		if cfg.openmp == "On" then
+		if filecfg.openmp == "On" then
 			extra = extra .. " /openmp"
 		end
 	end
