@@ -1,4 +1,4 @@
-﻿--
+--
 -- Name:        premake-ninja/ninja.lua
 -- Purpose:     Define the ninja action.
 -- Author:      Dmitry Ivanov
@@ -20,7 +20,7 @@ p.tools.msc.objectextension = ".obj"
 p.tools.clang.tools.rc = p.tools.clang.tools.rc or "windres"
 
 p.tools.msc.gettoolname = function(cfg, name)
-	local map = {cc = "cl", cxx = "cl", ar = "lib", rc = "rc"}
+	local map = {cc = "cl", cxx = "cl", ar = "lib", rc = "rc", asm = iif(cfg.platform == "x64", "ml64", "ml")}
 	return map[name]
 end
 
@@ -213,6 +213,10 @@ local function shouldcompileascpp(filecfg)
 	return path.iscppfile(filecfg.abspath)
 end
 
+local function shouldcompileasasm(filecfg)
+	return path.isasmfile(filecfg.abspath) or path.hasextension(filecfg.abspath, { ".asm" }) -- `path.isasmfile` actually only checks for `.s`?
+end
+
 local function getFileDependencies(cfg)
 	local dependencies = {}
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
@@ -243,6 +247,17 @@ local function getcxxflags(toolset, cfg, filecfg)
 	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
+end
+
+local function getmasmflags(toolset, cfg, filecfg)
+	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
+
+	local extra = ""
+	if filecfg.exceptionhandling == "SEH" then
+		extra = extra .. " /safeseh"
+	end
+
+	return defines .. extra
 end
 
 local function getldflags(toolset, cfg)
@@ -327,6 +342,7 @@ local function compilation_rules(cfg, toolset, pch)
 	local ar = toolset.gettoolname(cfg, "ar")
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	local rc = toolset.gettoolname(cfg, "rc")
+	local asm = toolset.gettoolname(cfg, "asm")
 
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
@@ -339,14 +355,19 @@ local function compilation_rules(cfg, toolset, pch)
 
 		p.w("CFLAGS=" .. all_cflags)
 		p.w("rule cc")
-		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
+		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes /c /Tc$in /Fo$out")
 		p.w("  description = cc $out")
 		p.w("  deps = msvc")
 		p.w("")
 		p.w("CXXFLAGS=" .. all_cxxflags)
 		p.w("rule cxx")
-		p.w("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
+		p.w("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes /c /Tp$in /Fo$out")
 		p.w("  description = cxx $out")
+		p.w("  deps = msvc")
+		p.w("")
+		p.w("rule asm")
+		p.w("  command = " .. asm .. " $ASMFLAGS" .. " /c /nologo /Zi /Fl\"\" /Fo$out /Ta $in")
+		p.w("  description = asm $out")
 		p.w("  deps = msvc")
 		p.w("")
 		p.w("RESFLAGS = " .. all_resflags)
@@ -479,7 +500,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 
-	if shouldcompileasc(filecfg) then
+	if shouldcompileasc(filecfg) or (toolset ~= p.tools.msc and shouldcompileasasm(filecfg)) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
 		local cflags = {}
@@ -495,6 +516,14 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
 		end
 		add_build(cfg, objfilename, {}, "cxx", {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
+	elseif shouldcompileasasm(filecfg) and toolset == p.tools.msc then
+		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
+		objfiles[#objfiles + 1] = objfilename
+		local asmflags = {}
+		if has_custom_settings then
+			asmflags = {"ASMFLAGS = $ASMFLAGS " .. getmasmflags(toolset, cfg, filecfg)}
+		end
+		add_build(cfg, objfilename, {}, "asm", {filepath}, {}, {}, asmflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
