@@ -1,4 +1,4 @@
-﻿--
+--
 -- Name:        premake-ninja/ninja.lua
 -- Purpose:     Define the ninja action.
 -- Author:      Dmitry Ivanov
@@ -334,9 +334,6 @@ local function compilation_rules(cfg, toolset, pch)
 	local all_resflags = getresflags(toolset, cfg, cfg)
 
 	if toolset == p.tools.msc then
-		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
-		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
-
 		p.w("CFLAGS=" .. all_cflags)
 		p.w("rule cc")
 		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
@@ -361,7 +358,7 @@ local function compilation_rules(cfg, toolset, pch)
 			p.w("")
 		else
 			p.w("rule link")
-			p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
+			p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. " /link" .. all_ldflags .. " /nologo /out:$out")
 			p.w("  description = link $out")
 			p.w("")
 		end
