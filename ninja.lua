@@ -71,26 +71,26 @@ local function add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 			-- custom_command rule is identical for each configuration (contrary to other rules)
 			-- So we can compare extra parameter
 			if string.startswith(cached.command, "custom_command") then
-				p.w("# INFO: Rule ignored, same as " .. cached.cfg_key)
+				p.outln("# INFO: Rule ignored, same as " .. cached.cfg_key)
 			else
 				local cfg_key = get_key(cfg)
 				p.warn(cached.cfg_key .. " and " .. cfg_key .. " both generate (differently?) " .. out .. ". Ignoring " .. cfg_key)
-				p.w("# WARNING: Rule ignored, using the one from " .. cached.cfg_key)
+				p.outln("# WARNING: Rule ignored, using the one from " .. cached.cfg_key)
 			end
 		else
 			local cfg_key = get_key(cfg)
 			p.warn(cached.cfg_key .. " and " .. cfg_key .. " both generate differently " .. out .. ". Ignoring " .. cfg_key)
-			p.w("# ERROR: Rule ignored, using the one from " .. cached.cfg_key)
+			p.outln("# ERROR: Rule ignored, using the one from " .. cached.cfg_key)
 		end
-		p.w("# " .. build_line)
+		p.outln("# " .. build_line)
 		for i, var in ipairs(vars or {}) do
-			p.w("#   " .. var)
+			p.outln("#   " .. var)
 		end
 		return
 	end
-	p.w(build_line)
+	p.outln(build_line)
 	for i, var in ipairs(vars or {}) do
-		p.w("  " .. var)
+		p.outln("  " .. var)
 	end
 	build_cache[out] = {
 		cfg_key = get_key(cfg),
@@ -138,11 +138,11 @@ function ninja.generateWorkspace(wks)
 	local oldGetDefaultSeparator = path.getDefaultSeparator
 	path.getDefaultSeparator = function() return "/" end
 
-	p.w("# solution build file")
-	p.w("# generated with premake ninja")
-	p.w("")
+	p.outln("# solution build file")
+	p.outln("# generated with premake ninja")
+	p.outln("")
 
-	p.w("# build projects")
+	p.outln("# build projects")
 	local cfgs = {} -- key is concatenated name or variant name, value is string of outputs names
 	local key = ""
 	local cfg_first = nil
@@ -169,24 +169,24 @@ function ninja.generateWorkspace(wks)
 				end
 
 				-- include other ninja file
-				p.w("subninja " .. ninja.esc(ninja.projectCfgFilename(cfg, true)))
+				p.outln("subninja " .. ninja.esc(ninja.projectCfgFilename(cfg, true)))
 			end
 		end
 	end
 
 	if cfg_first == nil then cfg_first = cfg_first_lib end
 
-	p.w("")
+	p.outln("")
 
-	p.w("# targets")
+	p.outln("# targets")
 	for cfg, outputs in pairs(cfgs) do
-		p.w("build " .. ninja.esc(cfg) .. ": phony" .. ninja.list(table.translate(outputs, ninja.esc)))
+		p.outln("build " .. ninja.esc(cfg) .. ": phony" .. ninja.list(table.translate(outputs, ninja.esc)))
 	end
-	p.w("")
+	p.outln("")
 
-	p.w("# default target")
-	p.w("default " .. ninja.esc(cfg_first))
-	p.w("")
+	p.outln("# default target")
+	p.outln("default " .. ninja.esc(cfg_first))
+	p.outln("")
 
 	path.getDefaultSeparator = oldGetDefaultSeparator
 end
@@ -275,10 +275,10 @@ local function prebuild_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.w("rule run_prebuild")
-		p.w("  command = " .. commands)
-		p.w("  description = prebuild")
-		p.w("")
+		p.outln("rule run_prebuild")
+		p.outln("  command = " .. commands)
+		p.outln("  description = prebuild")
+		p.outln("")
 	end
 end
 
@@ -294,10 +294,10 @@ local function prelink_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.w("rule run_prelink")
-		p.w("  command = " .. commands)
-		p.w("  description = prelink")
-		p.w("")
+		p.outln("rule run_prelink")
+		p.outln("  command = " .. commands)
+		p.outln("  description = prelink")
+		p.outln("")
 	end
 end
 
@@ -313,10 +313,10 @@ local function postbuild_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.w("rule run_postbuild")
-		p.w("  command = " .. commands)
-		p.w("  description = postbuild")
-		p.w("")
+		p.outln("rule run_postbuild")
+		p.outln("  command = " .. commands)
+		p.outln("  description = postbuild")
+		p.outln("")
 	end
 end
 
@@ -337,83 +337,83 @@ local function compilation_rules(cfg, toolset, pch)
 		-- for some reason Visual Studio add this libraries as "defaults" and premake doesn't tell us this
 		local default_msvc_libs = " kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib"
 
-		p.w("CFLAGS=" .. all_cflags)
-		p.w("rule cc")
-		p.w("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
-		p.w("  description = cc $out")
-		p.w("  deps = msvc")
-		p.w("")
-		p.w("CXXFLAGS=" .. all_cxxflags)
-		p.w("rule cxx")
-		p.w("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
-		p.w("  description = cxx $out")
-		p.w("  deps = msvc")
-		p.w("")
-		p.w("RESFLAGS = " .. all_resflags)
-		p.w("rule rc")
-		p.w("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
-		p.w("  description = rc $out")
-		p.w("")
+		p.outln("CFLAGS=" .. all_cflags)
+		p.outln("rule cc")
+		p.outln("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
+		p.outln("  description = cc $out")
+		p.outln("  deps = msvc")
+		p.outln("")
+		p.outln("CXXFLAGS=" .. all_cxxflags)
+		p.outln("rule cxx")
+		p.outln("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
+		p.outln("  description = cxx $out")
+		p.outln("  deps = msvc")
+		p.outln("")
+		p.outln("RESFLAGS = " .. all_resflags)
+		p.outln("rule rc")
+		p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
+		p.outln("  description = rc $out")
+		p.outln("")
 		if cfg.kind == p.STATICLIB then
-			p.w("rule ar")
-			p.w("  command = " .. ar .. " $in /nologo -OUT:$out")
-			p.w("  description = ar $out")
-			p.w("")
+			p.outln("rule ar")
+			p.outln("  command = " .. ar .. " $in /nologo -OUT:$out")
+			p.outln("  description = ar $out")
+			p.outln("")
 		else
-			p.w("rule link")
-			p.w("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
-			p.w("  description = link $out")
-			p.w("")
+			p.outln("rule link")
+			p.outln("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. default_msvc_libs .. " /link" .. all_ldflags .. " /nologo /out:$out")
+			p.outln("  description = link $out")
+			p.outln("")
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
-			p.w("rule build_pch")
-			p.w("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MMD -MF $out.d -c -o $out $in")
-			p.w("  description = build_pch $out")
-			p.w("  depfile = $out.d")
-			p.w("  deps = gcc")
+			p.outln("rule build_pch")
+			p.outln("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MMD -MF $out.d -c -o $out $in")
+			p.outln("  description = build_pch $out")
+			p.outln("  depfile = $out.d")
+			p.outln("  deps = gcc")
 		end
-		p.w("CFLAGS=" .. all_cflags)
-		p.w("rule cc")
-		p.w("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cc $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("CXXFLAGS=" .. all_cxxflags)
-		p.w("rule cxx")
-		p.w("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
-		p.w("  description = cxx $out")
-		p.w("  depfile = $out.d")
-		p.w("  deps = gcc")
-		p.w("")
-		p.w("RESFLAGS = " .. all_resflags)
-		p.w("rule rc")
-		p.w("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
-		p.w("  description = rc $out")
-		p.w("")
+		p.outln("CFLAGS=" .. all_cflags)
+		p.outln("rule cc")
+		p.outln("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MMD -MF $out.d -c -o $out $in")
+		p.outln("  description = cc $out")
+		p.outln("  depfile = $out.d")
+		p.outln("  deps = gcc")
+		p.outln("")
+		p.outln("CXXFLAGS=" .. all_cxxflags)
+		p.outln("rule cxx")
+		p.outln("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MMD -MF $out.d -c -o $out $in")
+		p.outln("  description = cxx $out")
+		p.outln("  depfile = $out.d")
+		p.outln("  deps = gcc")
+		p.outln("")
+		p.outln("RESFLAGS = " .. all_resflags)
+		p.outln("rule rc")
+		p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
+		p.outln("  description = rc $out")
+		p.outln("")
 		if cfg.kind == p.STATICLIB then
-			p.w("rule ar")
-			p.w("  command = " .. ar .. " rcs $out $in")
-			p.w("  description = ar $out")
-			p.w("")
+			p.outln("rule ar")
+			p.outln("  command = " .. ar .. " rcs $out $in")
+			p.outln("  description = ar $out")
+			p.outln("")
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, {"-Wl,--start-group ", " -Wl,--end-group"}, {"", ""})
-			p.w("rule link")
-			p.w("  command = " .. link .. " -o $out " .. groups[1] .. "$in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2])
-			p.w("  description = link $out")
-			p.w("")
+			p.outln("rule link")
+			p.outln("  command = " .. link .. " -o $out " .. groups[1] .. "$in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2])
+			p.outln("  description = link $out")
+			p.outln("")
 		end
 	end
 end
 
 local function custom_command_rule()
-	p.w("rule custom_command")
-	p.w("  command = $CUSTOM_COMMAND")
-	p.w("  description = $CUSTOM_DESCRIPTION")
-	p.w("")
+	p.outln("rule custom_command")
+	p.outln("  command = $CUSTOM_COMMAND")
+	p.outln("  description = $CUSTOM_DESCRIPTION")
+	p.outln("")
 end
 
 local function collect_generated_files(prj, cfg)
@@ -533,7 +533,7 @@ local function files_build(prj, cfg, toolset, pch_dependency, regular_file_depen
 		end
 	end,
 	}, false, 1)
-	p.w("")
+	p.outln("")
 
 	return objfiles
 end
@@ -541,7 +541,7 @@ end
 local function generated_files_build(cfg, generated_files, key)
 	local final_dependency = {}
 	if #generated_files > 0 then
-		p.w("# generated files")
+		p.outln("# generated files")
 		add_build(cfg, "generated_files_" .. key, {}, "phony", generated_files, {}, {}, {})
 		final_dependency = {"generated_files_" .. key}
 	end
@@ -564,14 +564,14 @@ function ninja.generateProjectCfg(cfg)
   -- Some toolset fixes
 	cfg.gccprefix = cfg.gccprefix or ""
 
-	p.w("# project build file")
-	p.w("# generated with premake ninja")
-	p.w("")
+	p.outln("# project build file")
+	p.outln("# generated with premake ninja")
+	p.outln("")
 
 	-- premake-ninja relies on scoped rules
 	-- and they were added in ninja v1.6
-	p.w("ninja_required_version = 1.6")
-	p.w("")
+	p.outln("ninja_required_version = 1.6")
+	p.outln("")
 
 	---------------------------------------------------- figure out settings
 	local pch = nil
@@ -587,7 +587,7 @@ function ninja.generateProjectCfg(cfg)
 	end
 
 	---------------------------------------------------- write rules
-	p.w("# core rules for " .. cfg.name)
+	p.outln("# core rules for " .. cfg.name)
 	prebuild_rule(cfg)
 	prelink_rule(cfg)
 	postbuild_rule(cfg)
@@ -595,7 +595,7 @@ function ninja.generateProjectCfg(cfg)
 	custom_command_rule()
 
 	---------------------------------------------------- build all files
-	p.w("# build files")
+	p.outln("# build files")
 
 	local pch_dependency = pch_build(cfg, pch)
 
@@ -609,17 +609,17 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
-		p.w("# prebuild")
+		p.outln("# prebuild")
 		add_build(cfg, "prebuild_" .. get_key(cfg), {}, "run_prebuild", {}, {}, {}, {})
 	end
 	local prelink_dependency = {}
 	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
-		p.w("# prelink")
+		p.outln("# prelink")
 		add_build(cfg, "prelink_" .. get_key(cfg), {}, "run_prelink", {}, objfiles, final_dependency, {})
 		prelink_dependency = { "prelink_" .. get_key(cfg) }
 	end
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
-		p.w("# postbuild")
+		p.outln("# postbuild")
 		add_build(cfg, "postbuild_" .. get_key(cfg), {}, "run_postbuild",  {}, {ninja.outputFilename(cfg)}, {}, {})
 	end
 
@@ -627,12 +627,12 @@ function ninja.generateProjectCfg(cfg)
 	-- because system libraries are often not in PATH so ninja can't find them
 	local libs = table.translate(config.getlinks(cfg, "siblings", "fullpath"), function (p) return project.getrelative(cfg.workspace, path.join(cfg.project.location, p)) end)
 	if cfg.kind == p.STATICLIB then
-		p.w("# link static lib")
+		p.outln("# link static lib")
 		add_build(cfg, ninja.outputFilename(cfg), {}, "ar", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency))
 
 	elseif cfg.kind == p.SHAREDLIB then
 		local output = ninja.outputFilename(cfg)
-		p.w("# link shared lib")
+		p.outln("# link shared lib")
 
 		local extra_outputs = {}
 		if ninja.endsWith(output, ".dll") then
@@ -648,20 +648,20 @@ function ninja.generateProjectCfg(cfg)
 		add_build(cfg, output, extra_outputs, "link", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
 
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
-		p.w("# link executable")
+		p.outln("# link executable")
 		add_build(cfg, ninja.outputFilename(cfg), {}, "link", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
 
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
 
-	p.w("")
+	p.outln("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		add_build(cfg, key, {}, "phony", {"postbuild_" .. get_key(cfg)}, {}, {}, {})
 	else
 		add_build(cfg, key, {}, "phony", {ninja.outputFilename(cfg)}, {}, {}, {})
 	end
-	p.w("")
+	p.outln("")
 
 	path.getDefaultSeparator = oldGetDefaultSeparator
 end
