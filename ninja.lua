@@ -632,7 +632,7 @@ function ninja.generateProjectCfg(cfg)
 		p.outln("# link shared lib")
 
 		local extra_outputs = {}
-		if ninja.endsWith(output, ".dll") then
+		if ninja.endsWith(output, ".dll") or toolset == p.tools.msc then
 			extra_outputs = { ninja.noext(output, ".dll") .. ".lib", ninja.noext(output, ".dll") .. ".exp" }
 		elseif ninja.endsWith(output, ".so") then
 			-- in case of .so there are no corresponding .a file
