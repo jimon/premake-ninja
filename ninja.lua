@@ -151,9 +151,8 @@ function ninja.generateWorkspace(wks)
 	for prj in p.workspace.eachproject(wks) do
 		if p.action.supports(prj.kind) and prj.kind ~= p.NONE then
 			for cfg in p.project.eachconfig(prj) do
-				key = prj.name .. "_" .. cfg.buildcfg
+				key = get_key(cfg)
 
-				if cfg.platform ~= nil then key = key .. "_" .. cfg.platform end
 				if not cfgs[cfg.buildcfg] then cfgs[cfg.buildcfg] = {} end
 				table.insert(cfgs[cfg.buildcfg], key)
 
@@ -551,7 +550,7 @@ function ninja.generateProjectCfg(cfg)
 	path.getDefaultSeparator = function() return "/" end
 
 	local prj = cfg.project
-	local key = prj.name .. "_" .. cfg.buildcfg
+	local key = get_key(cfg)
 	local toolset, toolset_version = p.tools.canonical(cfg.toolset)
 
 	if not toolset then
@@ -675,12 +674,7 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-
-	local ninjapath = relative .. "build_" .. cfg.project.name  .. "_" .. cfg.buildcfg
-
-	if cfg.platform ~= nil then ninjapath = ninjapath .. "_" .. cfg.platform end
-
-	return ninjapath .. ".ninja"
+	return relative .. "build_" .. get_key(cfg) .. ".ninja"
 end
 
 -- check if string starts with string
