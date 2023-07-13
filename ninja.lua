@@ -622,40 +622,29 @@ function ninja.generateProjectCfg(cfg)
 	-- we don't pass getlinks(cfg) through dependencies
 	-- because system libraries are often not in PATH so ninja can't find them
 	local libs = table.translate(config.getlinks(cfg, "siblings", "fullpath"), function (p) return project.getrelative(cfg.workspace, path.join(cfg.project.location, p)) end)
+	local cfg_output = ninja.outputFilename(cfg)
+	local extra_outputs = {}
+	local command_rule = ""
 	if cfg.kind == p.STATICLIB then
 		p.outln("# link static lib")
-		add_build(cfg, ninja.outputFilename(cfg), {}, "ar", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency))
-
+		command_rule = "ar"
 	elseif cfg.kind == p.SHAREDLIB then
-		local output = ninja.outputFilename(cfg)
 		p.outln("# link shared lib")
-
-		local extra_outputs = {}
-		if ninja.endsWith(output, ".dll") then
-			extra_outputs = { ninja.noext(output, ".dll") .. ".lib", ninja.noext(output, ".dll") .. ".exp" }
-		elseif ninja.endsWith(output, ".so") then
-			-- in case of .so there are no corresponding .a file
-		elseif ninja.endsWith(output, ".dylib") then
-			-- in case of .dylib there are no corresponding .a file
-		else
-			p.error("unknown type of shared lib '" .. output .. "', so no idea what to do, sorry")
-		end
-
-		add_build(cfg, output, extra_outputs, "link", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
-
+		command_rule = "link"
+		extra_outputs = iif(os.target() == "windows", {path.replaceextension(cfg_output, ".lib"), path.replaceextension(cfg_output, ".exp")}, {})
 	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
 		p.outln("# link executable")
-		add_build(cfg, ninja.outputFilename(cfg), {}, "link", table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
-
+		command_rule = "link"
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
+	add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
 
 	p.outln("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		add_build(cfg, key, {}, "phony", {"postbuild_" .. get_key(cfg)}, {}, {}, {})
 	else
-		add_build(cfg, key, {}, "phony", {ninja.outputFilename(cfg)}, {}, {}, {})
+		add_build(cfg, key, {}, "phony", {cfg_output}, {}, {}, {})
 	end
 	p.outln("")
 
@@ -685,11 +674,6 @@ end
 -- check if string ends with string
 function ninja.endsWith(str, ends)
 	return str:sub(-ends:len()) == ends
-end
-
--- removes extension from string
-function ninja.noext(str, ext)
-	return str:sub(0, str:len() - ext:len())
 end
 
 -- generate all build files for every project configuration
