@@ -475,7 +475,9 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 
-	if shouldcompileasc(filecfg) then
+	if filecfg.buildaction == "None" then
+		return
+	elseif shouldcompileasc(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
 		local cflags = {}
