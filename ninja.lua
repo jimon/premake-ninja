@@ -68,9 +68,9 @@ local function add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 		if build_line == cached.build_line
 			and table.equals(vars or {}, cached.vars or {})
 		then
-			-- custom_command rule is identical for each configuration (contrary to other rules)
+			-- custom_command/copy rule are identical for each configuration (contrary to other rules)
 			-- So we can compare extra parameter
-			if string.startswith(cached.command, "custom_command") then
+			if command == "custom_command" or command == "copy" then
 				p.outln("# INFO: Rule ignored, same as " .. cached.cfg_key)
 			else
 				local cfg_key = get_key(cfg)
@@ -412,6 +412,13 @@ local function custom_command_rule()
 	p.outln("")
 end
 
+local function copy_rule()
+	p.outln("rule copy")
+	p.outln("  command = " .. os.translateCommands("{COPYFILE} $in $out"))
+	p.outln("  description = copy $in $out")
+	p.outln("")
+end
+
 local function collect_generated_files(prj, cfg)
 	local generated_files = {}
 	tree.traverse(project.getsourcetree(prj), {
@@ -470,13 +477,17 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. ninja.shesc(output)})
 end
 
-local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
+local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles, extrafiles)
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 
 	if filecfg.buildaction == "None" then
 		return
+	elseif filecfg.buildaction == "Copy" then
+		local target = project.getrelative(cfg.workspace, path.join(cfg.targetdir, filecfg.name))
+		add_build(cfg, target, {}, "copy", {filepath}, {}, {}, {})
+		extrafiles[#extrafiles + 1] = target
 	elseif shouldcompileasc(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
@@ -506,6 +517,7 @@ end
 
 local function files_build(prj, cfg, toolset, pch_dependency, regular_file_dependencies, file_dependencies)
 	local objfiles = {}
+	local extrafiles = {}
 	tree.traverse(project.getsourcetree(prj), {
 	onleaf = function(node, depth)
 		local filecfg = fileconfig.getconfig(node, cfg)
@@ -527,13 +539,13 @@ local function files_build(prj, cfg, toolset, pch_dependency, regular_file_depen
 			local rulecfg = p.context.extent(rule, environ)
 			custom_command_build(prj, cfg, rulecfg, filepath, file_dependencies)
 		else
-			compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles)
+			compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles, extrafiles)
 		end
 	end,
 	}, false, 1)
 	p.outln("")
 
-	return objfiles
+	return objfiles, extrafiles
 end
 
 local function generated_files_build(cfg, generated_files, key)
@@ -590,6 +602,7 @@ function ninja.generateProjectCfg(cfg)
 	prelink_rule(cfg)
 	postbuild_rule(cfg)
 	compilation_rules(cfg, toolset, pch)
+	copy_rule()
 	custom_command_rule()
 
 	---------------------------------------------------- build all files
@@ -602,7 +615,7 @@ function ninja.generateProjectCfg(cfg)
 	local regular_file_dependencies = table.join(iif(#generated_files > 0, {"generated_files_" .. key}, {}), file_dependencies)
 
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
-	local objfiles = files_build(prj, cfg, toolset, pch_dependency, regular_file_dependencies, file_dependencies)
+	local objfiles, extrafiles = files_build(prj, cfg, toolset, pch_dependency, regular_file_dependencies, file_dependencies)
 	local final_dependency = generated_files_build(cfg, generated_files, key)
 
 	---------------------------------------------------- build final target
@@ -640,7 +653,7 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
-	add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, prelink_dependency), {})
+	add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, extrafiles, prelink_dependency), {})
 
 	p.outln("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
