@@ -8,11 +8,11 @@ For each project - configuration pair we create separate .ninja file. For soluti
 
 Build.ninja file sets phony targets for configuration names so you can build them from command line. And default target is the first configuration name in your project (usually default).
 
-### Tested on ![ubuntu-badge](https://github.com/jimon/premake-ninja/workflows/ubuntu/badge.svg) ![windows-badge](https://github.com/jimon/premake-ninja/workflows/windows/badge.svg) ![macos-badge](https://github.com/jimon/premake-ninja/workflows/macos/badge.svg)
+### Tested on ![ubuntu-badge](https://github.com/jimon/premake-ninja/actions/workflows/ubuntu.yml/badge.svg) ![windows-badge](https://github.com/jimon/premake-ninja/actions/workflows/windows.yml/badge.svg) ![macos-badge](https://github.com/jimon/premake-ninja/actions/workflows/macos.yml/badge.svg)
 
 ### Extra Tests
 
-Part of integration tests of several generators in https://github.com/Jarod42/premake-sample-projects ![Premake5 ubuntu ninja badge](https://github.com/Jarod42/premake-sample-projects/workflows/premake5-ubuntu-ninja/badge.svg)![Premake5 window ninja badge](https://github.com/Jarod42/premake-sample-projects/workflows/premake5-windows-ninja/badge.svg)
+Part of integration tests of several generators in https://github.com/Jarod42/premake-sample-projects ![Premake5 ubuntu ninja badge](https://github.com/Jarod42/premake-sample-projects/actions/workflows/premake5-ubuntu-ninja.yml/badge.svg)![Premake5 window ninja badge](https://github.com/Jarod42/premake-sample-projects/actions/workflows/premake5-windows-ninja.yml/badge.svg)
 
 ### TODO
 
