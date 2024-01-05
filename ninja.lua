@@ -28,11 +28,13 @@ end
 premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
-local function get_key(cfg)
+local function get_key(cfg, name)
+	local name = name or cfg.project.name
+
 	if cfg.platform then
-		return cfg.project.name .. "_" .. cfg.buildcfg .. "_" .. cfg.platform
+		return name .. "_" .. cfg.buildcfg .. "_" .. cfg.platform
 	else
-		return cfg.project.name .. "_" .. cfg.buildcfg
+		return name .. "_" .. cfg.buildcfg
 	end
 end
 
@@ -678,7 +680,7 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	return relative .. "build_" .. get_key(cfg) .. ".ninja"
+	return relative .. "build_" .. get_key(cfg, cfg.project.filename) .. ".ninja"
 end
 
 -- check if string starts with string
