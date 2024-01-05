@@ -178,7 +178,7 @@ function ninja.generateWorkspace(wks)
 	p.outln("")
 
 	p.outln("# targets")
-	for cfg, outputs in pairs(cfgs) do
+	for cfg, outputs in spairs(cfgs) do
 		p.outln("build " .. ninja.esc(cfg) .. ": phony" .. ninja.list(table.translate(outputs, ninja.esc)))
 	end
 	p.outln("")
