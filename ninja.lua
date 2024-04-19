@@ -475,7 +475,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		commands = commands[1]
 	end
 
-	add_build(cfg, output, outputs, "custom_command", {filename}, filecfg.buildinputs, file_dependencies,
+	add_build(cfg, output, outputs, "custom_command", {filename}, project.getrelative(prj.workspace, filecfg.buildinputs), file_dependencies,
 		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. ninja.shesc(output)})
 end
 
