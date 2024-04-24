@@ -149,6 +149,7 @@ function ninja.generateWorkspace(wks)
 	local key = ""
 	local cfg_first = nil
 	local cfg_first_lib = nil
+	local subninjas = {}
 
 	for prj in p.workspace.eachproject(wks) do
 		if p.action.supports(prj.kind) and prj.kind ~= p.NONE then
@@ -170,6 +171,7 @@ function ninja.generateWorkspace(wks)
 				end
 
 				-- include other ninja file
+				table.insert(subninjas, ninja.esc(ninja.projectCfgFilename(cfg, true)))
 				p.outln("subninja " .. ninja.esc(ninja.projectCfgFilename(cfg, true)))
 			end
 		end
@@ -184,6 +186,25 @@ function ninja.generateWorkspace(wks)
 		p.outln("build " .. ninja.esc(cfg) .. ": phony" .. ninja.list(table.translate(outputs, ninja.esc)))
 	end
 	p.outln("")
+
+	if wks.editorintegration then
+		-- we need to filter out the 'file' argument, since we already output
+		-- the script separately.
+		local args = {}
+		for _, arg in ipairs(_ARGV) do
+			if not (arg:startswith("--file") or arg:startswith("/file")) then
+				table.insert(args, arg);
+			end
+		end
+		p.outln('# Rule')
+		p.outln('rule premake')
+		p.outln('  command = ' .. ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' '))
+		p.outln('  generator = true')
+		p.outln('  restat = true')
+		p.outln("")
+		p.outln('build build.ninja ' .. table.concat(subninjas, " ") .. ': premake ' .. p.workspace.getrelative(wks, _MAIN_SCRIPT))
+		p.outln("")
+	end
 
 	p.outln("# default target")
 	p.outln("default " .. ninja.esc(cfg_first))
