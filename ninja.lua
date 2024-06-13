@@ -254,6 +254,19 @@ local function getcflags(toolset, cfg, filecfg)
 	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 
+	local extra = ""
+	if toolset == p.tools.msc then
+		if filecfg.cdialect and filecfg.cdialect ~= "Default" then
+			extra = extra .. " /std:" .. string.lower(filecfg.cdialect)
+		end
+		if filecfg.unsignedchar == "On" then
+			extra = extra .. " " .. p.tools.msc.shared.unsignedchar["On"]
+		end
+		if filecfg.openmp == "On" then
+			extra = extra .. " /openmp"
+		end
+	end
+
 	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
 end
 
@@ -264,7 +277,21 @@ local function getcxxflags(toolset, cfg, filecfg)
 	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
 	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
-	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
+
+	local extra = ""
+	if toolset == p.tools.msc then
+		if filecfg.cppdialect and filecfg.cppdialect ~= "Default" then
+			extra = extra .. " /std:" .. string.lower(filecfg.cppdialect)
+		end
+		if filecfg.unsignedchar == "On" then
+			extra = extra .. " " .. p.tools.msc.shared.unsignedchar["On"]
+		end
+		if filecfg.openmp == "On" then
+			extra = extra .. " /openmp"
+		end
+	end
+
+	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes .. extra
 end
 
 local function getldflags(toolset, cfg)
