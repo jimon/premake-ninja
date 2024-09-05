@@ -350,6 +350,15 @@ local function compilation_rules(cfg, toolset, pch)
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	local rc = toolset.gettoolname(cfg, "rc")
 
+	-- all paths need to be relative to the workspace output location,
+	-- and not relative to the project output location.
+	-- override the toolset getrelative function to achieve this
+
+	local getrelative = p.tools.getrelative
+	p.tools.getrelative = function(cfg, value)
+		return p.workspace.getrelative(cfg.workspace, value)
+	end
+
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
 	local all_ldflags = getldflags(toolset, cfg)
@@ -426,6 +435,8 @@ local function compilation_rules(cfg, toolset, pch)
 			p.outln("")
 		end
 	end
+
+	p.tools.getrelative = getrelative
 end
 
 local function custom_command_rule()
