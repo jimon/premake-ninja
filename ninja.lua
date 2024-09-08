@@ -251,8 +251,15 @@ local function getcflags(toolset, cfg, filecfg)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cflags = ninja.list(toolset.getcflags(filecfg))
 	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
-	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
+	
+	-- ninja expects include directories to be relative to the root folder.
+	-- what follows is a little hack to trick the toolsets into thinking cfg.workspace is actually cfg.project
+	-- and will therefore use that as the base for the relative paths
+	-- this is an issue with premake itself.
+	local cfg_override = cfg
+	cfg_override.project = cfg.workspace
+	local includes = ninja.list(toolset.getincludedirs(cfg_override, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
+	local forceincludes = ninja.list(toolset.getforceincludes(cfg_override))
 
 	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
 end
@@ -262,8 +269,16 @@ local function getcxxflags(toolset, cfg, filecfg)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cxxflags = ninja.list(toolset.getcxxflags(filecfg))
 	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
-	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
+	
+	-- ninja expects include directories to be relative to the root folder.
+	-- what follows is a little hack to trick the toolsets into thinking cfg.workspace is actually cfg.project
+	-- and will therefore use that as the base for the relative paths
+	-- this is an issue with premake itself.
+	local cfg_override = cfg
+	cfg_override.project = cfg.workspace
+	local includes = ninja.list(toolset.getincludedirs(cfg_override, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
+	local forceincludes = ninja.list(toolset.getforceincludes(cfg_override))
+
 	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 end
 
@@ -348,7 +363,11 @@ local function compilation_rules(cfg, toolset, pch)
 	local cxx = toolset.gettoolname(cfg, "cxx")
 	local ar = toolset.gettoolname(cfg, "ar")
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
-	local rc = toolset.gettoolname(cfg, "rc")
+	-- only compile rc files on windows
+	local rc = ""
+	if cfg.system == premake.WINDOWS then
+		rc = toolset.gettoolname(cfg, "rc")
+	end
 
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
@@ -368,11 +387,14 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("  description = cxx $out")
 		p.outln("  deps = msvc")
 		p.outln("")
-		p.outln("RESFLAGS = " .. all_resflags)
-		p.outln("rule rc")
-		p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
-		p.outln("  description = rc $out")
-		p.outln("")
+		-- only compile rc files on windows
+		if cfg.system == premake.WINDOWS then
+			p.outln("RESFLAGS = " .. all_resflags)
+			p.outln("rule rc")
+			p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
+			p.outln("  description = rc $out")
+			p.outln("")
+		end
 		if cfg.kind == p.STATICLIB then
 			p.outln("rule ar")
 			p.outln("  command = " .. ar .. " $in /nologo -OUT:$out")
@@ -384,7 +406,7 @@ local function compilation_rules(cfg, toolset, pch)
 			p.outln("  description = link $out")
 			p.outln("")
 		end
-	elseif toolset == p.tools.clang or toolset == p.tools.gcc then
+	elseif toolset == p.tools.clang or toolset == p.tools.gcc or (toolset.clang_like ~= nil and toolset.clang_like()) then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
@@ -408,11 +430,14 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("  depfile = $out.d")
 		p.outln("  deps = gcc")
 		p.outln("")
-		p.outln("RESFLAGS = " .. all_resflags)
-		p.outln("rule rc")
-		p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
-		p.outln("  description = rc $out")
-		p.outln("")
+		-- only compile rc files on windows
+		if cfg.system == premake.WINDOWS then
+			p.outln("RESFLAGS = " .. all_resflags)
+			p.outln("rule rc")
+			p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
+			p.outln("  description = rc $out")
+			p.outln("")
+		end
 		if cfg.kind == p.STATICLIB then
 			p.outln("rule ar")
 			p.outln("  command = " .. ar .. " rcs $out $in")
