@@ -406,7 +406,7 @@ local function compilation_rules(cfg, toolset, pch)
 			p.outln("  description = link $out")
 			p.outln("")
 		end
-	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then -- << EMSCRIPTEN (or toolset == p.tools.emcc)
+	elseif toolset == p.tools.clang or toolset == p.tools.gcc or (toolset.clang_like ~= nil and toolset.clang_like()) then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
