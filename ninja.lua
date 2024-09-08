@@ -364,7 +364,7 @@ local function compilation_rules(cfg, toolset, pch)
 	local ar = toolset.gettoolname(cfg, "ar")
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	-- only compile rc files on windows
-	if cfg.platform == premake.WINDOWS then
+	if cfg.system == premake.WINDOWS then
 		local rc = toolset.gettoolname(cfg, "rc")
 	end
 
@@ -387,7 +387,7 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("  deps = msvc")
 		p.outln("")
 		-- only compile rc files on windows
-		if cfg.platform == premake.WINDOWS then
+		if cfg.system == premake.WINDOWS then
 			p.outln("RESFLAGS = " .. all_resflags)
 			p.outln("rule rc")
 			p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
@@ -430,7 +430,7 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("  deps = gcc")
 		p.outln("")
 		-- only compile rc files on windows
-		if cfg.platform == premake.WINDOWS then
+		if cfg.system == premake.WINDOWS then
 			p.outln("RESFLAGS = " .. all_resflags)
 			p.outln("rule rc")
 			p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
