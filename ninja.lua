@@ -364,8 +364,9 @@ local function compilation_rules(cfg, toolset, pch)
 	local ar = toolset.gettoolname(cfg, "ar")
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	-- only compile rc files on windows
+	local rc = ""
 	if cfg.system == premake.WINDOWS then
-		local rc = toolset.gettoolname(cfg, "rc")
+		rc = toolset.gettoolname(cfg, "rc")
 	end
 
 	local all_cflags = getcflags(toolset, cfg, cfg)
