@@ -368,6 +368,20 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("  description = cxx $out")
 		p.outln("  deps = msvc")
 		p.outln("")
+		p.outln("CFLAGS=" .. all_cflags)
+		p.outln("rule clangtidy_cc")
+		p.outln("  command = clang-tidy $in -- -x c $CFLAGS &&$")
+		p.outln("            " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
+		p.outln("  description = cc $out")
+		p.outln("  deps = msvc")
+		p.outln("")
+		p.outln("CXXFLAGS=" .. all_cxxflags)
+		p.outln("rule clangtidy_cxx")
+		p.outln("  command = clang-tidy $in -- -x c++ $CFLAGS &&$")
+		p.outln("            " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
+		p.outln("  description = cxx $out")
+		p.outln("  deps = msvc")
+		p.outln("")
 		p.outln("RESFLAGS = " .. all_resflags)
 		p.outln("rule rc")
 		p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
@@ -404,6 +418,22 @@ local function compilation_rules(cfg, toolset, pch)
 		p.outln("CXXFLAGS=" .. all_cxxflags)
 		p.outln("rule cxx")
 		p.outln("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MF $out.d -c -o $out $in")
+		p.outln("  description = cxx $out")
+		p.outln("  depfile = $out.d")
+		p.outln("  deps = gcc")
+		p.outln("")
+		p.outln("CFLAGS=" .. all_cflags)
+		p.outln("rule clangtidy_cc")
+		p.outln("  command = clang-tidy $in -- -x c $CFLAGS"  .. force_include_pch .. " &&$")
+		p.outln("            " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MF $out.d -c -o $out $in")
+		p.outln("  description = cc $out")
+		p.outln("  depfile = $out.d")
+		p.outln("  deps = gcc")
+		p.outln("")
+		p.outln("CXXFLAGS=" .. all_cxxflags)
+		p.outln("rule clangtidy_cxx")
+		p.outln("  command = clang-tidy $in -- -x c++ $CFLAGS"  .. force_include_pch .. " &&$")
+		p.outln("            " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MF $out.d -c -o $out $in")
 		p.outln("  description = cxx $out")
 		p.outln("  depfile = $out.d")
 		p.outln("  deps = gcc")
@@ -504,6 +534,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
+	local use_clangtidy = filecfg.clangtidy or (filecfg.clangtidy == nil and cfg.clangtidy)
 
 	if filecfg.buildaction == "None" then
 		return
@@ -518,7 +549,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, "cc", {filepath}, pch_dependency, regular_file_dependencies, cflags)
+		add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
@@ -526,7 +557,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, "cxx", {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
+		add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
 		objfiles[#objfiles + 1] = objfilename
