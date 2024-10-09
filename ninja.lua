@@ -334,7 +334,7 @@ local function fixupbuildcommands(cfg,commands)
 		local newvalue = ""
 
 
-		for _,item in ipairs(splits) do
+		for ind,item in ipairs(splits) do
 			local ispath = string.find(item,"/") or string.find(item,"\\")
 
 			if ispath then
@@ -343,6 +343,11 @@ local function fixupbuildcommands(cfg,commands)
 			else
 				newvalue = newvalue .. item
 			end
+
+			if ind ~= #splits then
+				newvalue = newvalue .. " "
+			end
+
 		end
 
 		table.insert(newcommands,newvalue)
