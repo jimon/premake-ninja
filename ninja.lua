@@ -250,7 +250,7 @@ local function getFileDependencies(cfg)
 		dependencies = {"prebuild_" .. get_key(cfg)}
 	end
 	for i = 1, #cfg.dependson do
-		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg)
+		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg .. "_" .. cfg.platform)
 	end
 	return dependencies
 end
