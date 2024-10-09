@@ -328,7 +328,7 @@ local function fixupbuildcommands(cfg,commands)
 	end
 
 	local newcommands = {}
-	for _,Item in ipairs(cfg.prebuildcommands) do
+	for _,Item in ipairs(commands) do
 
 		local splits = splitstring(Item," ")
 		local newvalue = ""
@@ -345,7 +345,7 @@ local function fixupbuildcommands(cfg,commands)
 			end
 		end
 
-		table.insert(newcommands,newinput)
+		table.insert(newcommands,newvalue)
 	end
 
 
