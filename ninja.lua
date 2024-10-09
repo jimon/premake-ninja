@@ -244,11 +244,7 @@ local function shouldcompileascpp(filecfg)
 	return path.iscppfile(filecfg.abspath)
 end
 
-local function getFileDependencies(cfg)
-	local dependencies = {}
-	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
-		dependencies = {"prebuild_" .. get_key(cfg)}
-	end
+local function addcfgDependencies(dependencies,cfg)
 	for i = 1, #cfg.dependson do
 		local dependposfix = cfg.buildcfg
 		if cfg.platform then
@@ -256,6 +252,19 @@ local function getFileDependencies(cfg)
 		end
 		table.insert(dependencies, cfg.dependson[i] .. "_" .. dependposfix)
 	end
+end
+
+local function getcfgDependencies(cfg)
+	local dependencies = {}
+	addcfgDependencies(dependencies,cfg)
+	return dependencies
+end
+local function getFileDependencies(cfg)
+	local dependencies = {}
+	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
+		dependencies = {"prebuild_" .. get_key(cfg)}
+	end
+	addcfgDependencies(dependencies,cfg)
 	return dependencies
 end
 
@@ -758,7 +767,7 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		p.outln("# prebuild")
-		add_build(cfg, "prebuild_" .. get_key(cfg), {}, "run_prebuild", {}, {}, {}, {})
+		add_build(cfg, "prebuild_" .. get_key(cfg), {}, "run_prebuild", {}, {}, getcfgDependencies(cfg), {})
 	end
 	local prelink_dependency = {}
 	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
