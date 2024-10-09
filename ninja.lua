@@ -314,13 +314,50 @@ local function getresflags(toolset, cfg, filecfg)
 	return defines .. includes .. options
 end
 
+local function fixupbuildcommands(cfg,commands)
+
+	local function splitstring(inputstr, sep)
+		if sep == nil then
+			sep = "%s"
+		end
+		local t = {}
+		for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
+			table.insert(t, str)
+		end
+		return t
+	end
+
+	local newcommands = {}
+	for _,Item in ipairs(cfg.prebuildcommands) do
+
+		local splits = splitstring(Item," ")
+		local newvalue = ""
+
+
+		for _,item in ipairs(splits) do
+			local ispath = string.find(item,"/") or string.find(item,"\\")
+
+			if ispath then
+				local relative = path.getrelative(cfg.workspace.location,cfg.project.location)
+				newvalue = newvalue .. relative .. "/" .. item
+			else
+				newvalue = newvalue .. item
+			end
+		end
+
+		table.insert(newcommands,newinput)
+	end
+
+
+	return newcommands
+end
 local function prebuild_rule(cfg)
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		local commands = {}
 		if cfg.prebuildmessage then
 			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prebuildmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.workspace.basedir, cfg.workspace.location))
+		commands = table.join(commands, os.translateCommandsAndPaths( fixupbuildcommands(cfg,cfg.prebuildcommands), cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
@@ -333,13 +370,14 @@ local function prebuild_rule(cfg)
 	end
 end
 
+
 local function prelink_rule(cfg)
 	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
 		local commands = {}
 		if cfg.prelinkmessage then
 			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.prelinkmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prelinkcommands, cfg.workspace.basedir, cfg.workspace.location))
+		commands = table.join(commands, os.translateCommandsAndPaths( fixupbuildcommands(cfg,cfg.prelinkcommands), cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
@@ -358,7 +396,7 @@ local function postbuild_rule(cfg)
 		if cfg.postbuildmessage then
 			commands = {os.translateCommandsAndPaths("{ECHO} " .. cfg.postbuildmessage, cfg.workspace.basedir, cfg.workspace.location)}
 		end
-		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.workspace.basedir, cfg.workspace.location))
+		commands = table.join(commands, os.translateCommandsAndPaths( fixupbuildcommands(cfg,cfg.postbuildcommands), cfg.workspace.basedir, cfg.workspace.location))
 		if (#commands > 1) then
 			commands = 'sh -c ' .. ninja.quote(table.implode(commands,"","",";"))
 		else
