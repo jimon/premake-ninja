@@ -263,10 +263,6 @@ end
 local function fixincludedir(cfg,includedirs)
 	local fixincludedirs = {}
 	for _,value in ipairs(includedirs) do
-		if value == cfg.project.location then -- the '.' this would make would not work as the working directory would not change.
-			value = path.getrelative(cfg.workspace.location,cfg.project.location)
-		end
-
 		local newvalue = path.getrelative(cfg.workspace.location, value)
 
 		table.insert(fixincludedirs,newvalue)
