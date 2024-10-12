@@ -323,46 +323,17 @@ local function getresflags(toolset, cfg, filecfg)
 	return defines .. includes .. options
 end
 
-local function fixupbuildcommands(cfg,commands)
-
-	local function splitstring(inputstr, sep)
-		if sep == nil then
-			sep = "%s"
-		end
-		local t = {}
-		for str in string.gmatch(inputstr, "([^"..sep.."]+)") do
-			table.insert(t, str)
-		end
-		return t
+local function fixupbuildcommands(cfg, commands)
+	if cfg.workspace.location == cfg.project.location then
+		return commands
 	end
+	local relative = path.getrelative(cfg.workspace.location, cfg.project.location)
+	
+	local newcommands = { "cd " .. relative }
 
-	local newcommands = {}
-	for _,Item in ipairs(commands) do
-
-		local splits = splitstring(Item," ")
-		local newvalue = ""
-
-
-		for ind,item in ipairs(splits) do
-			local ispath = string.find(item,"/") or string.find(item,"\\")
-
-			if ispath then
-				local relative = path.getrelative(cfg.workspace.location,cfg.project.location)
-				newvalue = newvalue .. relative .. "/" .. item
-			else
-				newvalue = newvalue .. item
-			end
-
-			if ind ~= #splits then
-				newvalue = newvalue .. " "
-			end
-
-		end
-
-		table.insert(newcommands,newvalue)
+	for _, Item in ipairs(commands) do
+		table.insert(newcommands, Item)
 	end
-
-
 	return newcommands
 end
 local function prebuild_rule(cfg)
