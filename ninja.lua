@@ -246,12 +246,21 @@ local function getFileDependencies(cfg)
 	return dependencies
 end
 
+local function fixincludedir(cfg,includedirs)
+	local fixincludedirs = {}
+	for _,value in ipairs(includedirs) do
+		local newvalue = path.getrelative(cfg.workspace.location, value)
+
+		table.insert(fixincludedirs,newvalue)
+	end
+	return fixincludedirs
+end
 local function getcflags(toolset, cfg, filecfg)
 	local buildopt = ninja.list(filecfg.buildoptions)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cflags = ninja.list(toolset.getcflags(filecfg))
 	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
+	local includes = ninja.list(toolset.getincludedirs(cfg, fixincludedir(cfg,filecfg.includedirs), filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 
 	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
@@ -262,7 +271,7 @@ local function getcxxflags(toolset, cfg, filecfg)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cxxflags = ninja.list(toolset.getcxxflags(filecfg))
 	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
-	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
+	local includes = ninja.list(toolset.getincludedirs(cfg, fixincludedir(cfg,filecfg.includedirs), filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
 	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 end
