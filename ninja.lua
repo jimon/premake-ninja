@@ -242,12 +242,12 @@ local function getFileDependencies(cfg)
 	end
 	for i = 1, #cfg.dependson do
 
-		local dependposfix = ""
+		local dependpostfix = ""
 		if cfg.platform then
-			dependposfix = "_" .. cfg.platform
+			dependpostfix = "_" .. cfg.platform
 		end
 
-		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg .. dependposfix)
+		table.insert(dependencies, cfg.dependson[i] .. "_" .. cfg.buildcfg .. dependpostfix)
 	end
 	return dependencies
 end
