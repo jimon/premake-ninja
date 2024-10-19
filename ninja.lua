@@ -172,8 +172,9 @@ function ninja.generateWorkspace(wks)
 					if wks.defaultplatform == "" then 
 						cfg_first = key
 					elseif cfg.platform == wks.defaultplatform then
-						cfg_first = key
-						break
+						if cfg_first == nil then
+							cfg_first = key
+						end
 					end
 				end
 
