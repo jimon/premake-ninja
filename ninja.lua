@@ -160,7 +160,7 @@ function ninja.generateWorkspace(wks)
 				table.insert(cfgs[cfg.buildcfg], key)
 
 				-- set first configuration name
-				if wks.defaultplatform == "" then 
+				if wks.defaultplatform == nil then 
 					if (cfg_first == nil) and (cfg.kind == p.CONSOLEAPP or cfg.kind == p.WINDOWEDAPP) then
 						cfg_first = key
 					end
@@ -169,7 +169,7 @@ function ninja.generateWorkspace(wks)
 					cfg_first_lib = key
 				end
 				if prj.name == wks.startproject then
-					if wks.defaultplatform == "" then 
+					if wks.defaultplatform == nil then 
 						cfg_first = key
 					elseif cfg.platform == wks.defaultplatform then
 						if cfg_first == nil then
