@@ -584,7 +584,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		end
 		add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
-		local objfilename = obj_dir .. "/" .. filecfg.name .. ".res"
+		local objfilename = obj_dir .. "/" .. filecfg.basename .. ".res"
 		objfiles[#objfiles + 1] = objfilename
 		local resflags = {}
 		if has_custom_settings then
