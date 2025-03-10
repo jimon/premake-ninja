@@ -204,6 +204,12 @@ class TestStaticLib(Helper):
 		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
 		self.exit_test()
 
+	# test more complex app
+	def test_complex(self):
+		self.enter_test("static_lib/complex")
+		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
+		self.exit_test()
+
 	# test static lib with app
 	def test_withapp(self):
 		self.enter_test("static_lib/withapp")
