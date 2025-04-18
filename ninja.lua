@@ -286,12 +286,15 @@ local function getcxxflags(toolset, cfg, filecfg)
 end
 
 local function getldflags(toolset, cfg)
-	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
+	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg),
+		toolset.getrunpathdirs(cfg, table.join(cfg.runpathdirs, config.getsiblingtargetdirs(cfg))),
+		toolset.getldflags(cfg), cfg.linkoptions))
 
 	-- experimental feature, change install_name of shared libs
 	--if (toolset == p.tools.clang) and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
+
 	return ldflags
 end
 
