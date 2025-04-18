@@ -28,6 +28,12 @@ end
 premake.modules.ninja = {}
 local ninja = p.modules.ninja
 
+ninja.handlers = {}
+
+function ninja.register_handler(kind, compilation_rules, target_rules)
+	ninja.handlers[kind] = { compilation_rules = compilation_rules, target_rules = target_rules }
+end
+
 local function get_key(cfg, name)
 	local name = name or cfg.project.name
 
@@ -367,7 +373,7 @@ local function postbuild_rule(cfg)
 	end
 end
 
-local function compilation_rules(cfg, toolset, pch)
+local function c_cpp_compilation_rules(cfg, toolset, pch)
 	---------------------------------------------------- figure out toolset executables
 	local cc = toolset.gettoolname(cfg, "cc")
 	local cxx = toolset.gettoolname(cfg, "cxx")
@@ -673,16 +679,20 @@ function ninja.generateProjectCfg(cfg)
 	p.outln("ninja_required_version = 1.6")
 	p.outln("")
 
+	local is_c_or_cpp = cfg.language == p.C or cfg.language == p.CPP;
+
 	---------------------------------------------------- figure out settings
-	local pch = nil
-	if toolset ~= p.tools.msc then
-		pch = p.tools.gcc.getpch(cfg)
-		if pch then
-			pch = {
-				input = pch,
-				placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
-				gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. ".gch"))
-			}
+	if is_c_or_cpp then
+		local pch = nil
+		if toolset ~= p.tools.msc then
+			pch = p.tools.gcc.getpch(cfg)
+			if pch then
+				pch = {
+					input = pch,
+					placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
+					gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. ".gch"))
+				}
+			end
 		end
 	end
 
@@ -691,16 +701,27 @@ function ninja.generateProjectCfg(cfg)
 	prebuild_rule(cfg)
 	prelink_rule(cfg)
 	postbuild_rule(cfg)
-	compilation_rules(cfg, toolset, pch)
+
+	if is_c_or_cpp then
+		c_cpp_compilation_rules(cfg, toolset, pch)
+	else
+		local handler = ninja.handlers[cfg.language]
+		if not handler then
+			p.error("expected registered ninja handler action for target " .. cfg.language)
+		end
+		handler.compilation_rules(cfg, toolset)
+	end
+
 	copy_rule()
 	custom_command_rule()
 
 	---------------------------------------------------- build all files
 	p.outln("# build files")
 
-	local pch_dependency = pch_build(cfg, pch)
+	local pch_dependency = is_c_or_cpp and pch_build(cfg, pch) or {}
 
 	local generated_files = collect_generated_files(prj, cfg)
+
 	local file_dependencies = getFileDependencies(cfg)
 	local regular_file_dependencies = table.join(iif(#generated_files > 0, {"generated_files_" .. key}, {}), file_dependencies)
 
@@ -724,32 +745,44 @@ function ninja.generateProjectCfg(cfg)
 		ninja.add_build(cfg, "postbuild_" .. get_key(cfg), {}, "run_postbuild",  {}, {ninja.outputFilename(cfg)}, {}, {})
 	end
 
-	-- we don't pass getlinks(cfg) through dependencies
-	-- because system libraries are often not in PATH so ninja can't find them
-	local libs = table.translate(config.getlinks(cfg, "siblings", "fullpath"), function (p) return project.getrelative(cfg.workspace, path.join(cfg.project.location, p)) end)
-	local cfg_output = ninja.outputFilename(cfg)
-	local extra_outputs = {}
-	local command_rule = ""
-	if cfg.kind == p.STATICLIB then
-		p.outln("# link static lib")
-		command_rule = "ar"
-	elseif cfg.kind == p.SHAREDLIB then
-		p.outln("# link shared lib")
-		command_rule = "link"
-		extra_outputs = iif(os.target() == "windows", {path.replaceextension(cfg_output, ".lib"), path.replaceextension(cfg_output, ".exp")}, {})
-	elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
-		p.outln("# link executable")
-		command_rule = "link"
+	if is_c_or_cpp then
+		-- we don't pass getlinks(cfg) through dependencies
+		-- because system libraries are often not in PATH so ninja can't find them
+		local libs = table.translate(config.getlinks(cfg, "siblings", "fullpath"),
+			function (p) return project.getrelative(cfg.workspace, path.join(cfg.project.location, p)) end)
+		local cfg_output = ninja.outputFilename(cfg)
+		local extra_outputs = {}
+		local command_rule = ""
+		if cfg.kind == p.STATICLIB then
+			p.outln("# link static lib")
+			command_rule = "ar"
+		elseif cfg.kind == p.SHAREDLIB then
+			p.outln("# link shared lib")
+			command_rule = "link"
+			extra_outputs = iif(os.target() == "windows", {path.replaceextension(cfg_output, ".lib"), path.replaceextension(cfg_output, ".exp")}, {})
+		elseif (cfg.kind == p.CONSOLEAPP) or (cfg.kind == p.WINDOWEDAPP) then
+			p.outln("# link executable")
+			command_rule = "link"
+		else
+			p.error("ninja action doesn't support this kind of target " .. cfg.kind)
+		end
+
+		local deps = table.join(final_dependency, extrafiles, prelink_dependency)
+		ninja.add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, deps, {})
+		outputs = {cfg_output}
 	else
-		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
+		local handler = ninja.handlers[cfg.language]
+		if not handler then
+			p.error("expected registered ninja handler action for target " .. cfg.language)
+		end
+		outputs = handler.target_rules(cfg, toolset)
 	end
-	ninja.add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, extrafiles, prelink_dependency), {})
 
 	p.outln("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		ninja.add_build(cfg, key, {}, "phony", {"postbuild_" .. get_key(cfg)}, {}, {}, {})
 	else
-		ninja.add_build(cfg, key, {}, "phony", {cfg_output}, {}, {}, {})
+		ninja.add_build(cfg, key, {}, "phony", outputs, {}, {}, {})
 	end
 	p.outln("")
 
