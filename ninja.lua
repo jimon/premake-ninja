@@ -208,6 +208,8 @@ function ninja.generateWorkspace(wks)
 				table.insert(args, arg);
 			end
 		end
+		table.sort(args)
+
 		p.outln('# Rule')
 		p.outln('rule premake')
 		p.outln('  command = ' .. ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' '))
