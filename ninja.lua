@@ -810,7 +810,7 @@ function ninja.projectCfgFilename(cfg, relative)
 	else
 		relative = ""
 	end
-	return relative .. "build_" .. get_key(cfg, cfg.project.filename) .. ".ninja"
+	return relative .. get_key(cfg, cfg.project.filename) .. ".ninja"
 end
 
 -- check if string starts with string
