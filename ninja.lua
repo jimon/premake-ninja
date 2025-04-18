@@ -220,9 +220,11 @@ function ninja.generateWorkspace(wks)
 		p.outln("")
 	end
 
-	p.outln("# default target")
-	p.outln("default " .. ninja.esc(cfg_first))
-	p.outln("")
+	if cfg_first then
+		p.outln("# default target")
+		p.outln("default " .. ninja.esc(cfg_first))
+		p.outln("")
+	end
 
 	path.getDefaultSeparator = oldGetDefaultSeparator
 end
