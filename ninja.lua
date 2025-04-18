@@ -135,6 +135,10 @@ function ninja.shesc(value)
 	return value
 end
 
+function ninja.can_generate(prj)
+	return p.action.supports(prj.kind) and prj.kind ~= p.NONE
+end
+
 -- generate solution that will call ninja for projects
 function ninja.generateWorkspace(wks)
 	local oldGetDefaultSeparator = path.getDefaultSeparator
@@ -152,7 +156,7 @@ function ninja.generateWorkspace(wks)
 	local subninjas = {}
 
 	for prj in p.workspace.eachproject(wks) do
-		if p.action.supports(prj.kind) and prj.kind ~= p.NONE then
+		if ninja.can_generate(prj) then
 			for cfg in p.project.eachconfig(prj) do
 				key = get_key(cfg)
 
@@ -772,7 +776,7 @@ end
 
 -- generate all build files for every project configuration
 function ninja.generateProject(prj)
-	if not p.action.supports(prj.kind) or prj.kind == p.NONE then
+	if not ninja.can_generate(prj) then
 		return
 	end
 	for cfg in project.eachconfig(prj) do
