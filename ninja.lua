@@ -438,7 +438,7 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 			p.outln("  description = link $out")
 			p.outln("")
 		end
-	elseif toolset == p.tools.clang or toolset == p.tools.gcc then
+	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include_pch = ""
 		if pch then
 			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)

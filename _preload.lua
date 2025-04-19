@@ -18,7 +18,7 @@
 		-- The capabilities of this action
 		valid_kinds		= {"ConsoleApp", "WindowedApp", "SharedLib", "StaticLib", "None"}, -- Not supported: Makefile, Packaging, SharedItems, Utility
 		valid_languages	= {"C", "C++"},
-		valid_tools		= {cc = { "gcc", "clang", "msc" }},
+		valid_tools		= {cc = { "gcc", "clang", "msc", "emcc" }},
 
 		toolset = iif(os.target() == "windows", "msc-v142", -- Visual Studio 2019
 							iif(os.target() == "macosx", "clang", "gcc")),
