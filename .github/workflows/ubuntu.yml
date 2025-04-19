@@ -22,6 +22,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
+    - uses: mymindstorm/setup-emsdk@v14
+
     - name: install premake5
       uses: Jarod42/install-premake5@v5
 

@@ -81,7 +81,10 @@ class Helper(unittest.TestCase):
 	# call premake in the test
 	def premake(self):
 		if override_compiler:
-			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "--cc=" + override_compiler, "ninja"]), 0, "looks like premake failed")
+			args = ["premake5", "--scripts=../../..", "--cc=" + override_compiler, "ninja"]
+			if override_compiler == "emcc":
+				args += ["--os=emscripten"]
+			self.assertEqual(subprocess.call(args), 0, "looks like premake failed")
 		else:
 			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0, "looks like premake failed")
 
@@ -106,7 +109,7 @@ class Helper(unittest.TestCase):
 
 	# check if executable exist
 	def out_exist(self, path):
-		print("Looking for {} in {}", path, os.listdir(os.path.dirname(path)))
+		print(f"Looking for {path} in {os.listdir(os.path.dirname(path))}")
 		sys.stdout.flush()
 		self.assertTrue(
 			os.path.exists(path) or
@@ -116,9 +119,10 @@ class Helper(unittest.TestCase):
 			os.path.exists(self.out_name(path, ".a", "lib")) or
 			os.path.exists(self.out_name(path, ".dll")) or
 			os.path.exists(self.out_name(path, ".so", "lib")) or
-			os.path.exists(self.out_name(path, ".dylib", "lib"))
+			os.path.exists(self.out_name(path, ".dylib", "lib")) or
+			os.path.exists(self.out_name(path, ".wasm"))
 		)
-		print("Found {}", path)
+		print(f"Found {path}")
 		sys.stdout.flush()
 	# check if executable doesn't exist
 	def out_not_exist(self, path):
@@ -130,7 +134,8 @@ class Helper(unittest.TestCase):
 			os.path.exists(self.out_name(path, ".a", "lib")) or
 			os.path.exists(self.out_name(path, ".dll")) or
 			os.path.exists(self.out_name(path, ".so", "lib")) or
-			os.path.exists(self.out_name(path, ".dylib", "lib"))
+			os.path.exists(self.out_name(path, ".dylib", "lib")) or
+			os.path.exists(self.out_name(path, ".wasm"))
 		)
 
 	# check if executable exist
@@ -179,8 +184,9 @@ class Helper(unittest.TestCase):
 		self.out_exist(out_release)
 
 		# run executables to check if they are valid
-		self.exe(out_debug)
-		self.exe(out_release)
+		if override_compiler != "emcc":
+			self.exe(out_debug)
+			self.exe(out_release)
 
 # ----------------------------------------------------- console app tests
 class TestConsoleApp(Helper):
@@ -218,12 +224,18 @@ class TestStaticLib(Helper):
 class TestSharedLib(Helper):
 	# test simple app
 	def test_simple(self):
+		# Skip shared library tests on Emscripten since this is an advanced feature not supported by Premake yet.
+		if override_compiler == "emcc":
+			return
 		self.enter_test("shared_lib/simple")
 		self.check_basics("build/bin_debug/ninjatestprj", "build/bin_release/ninjatestprj")
 		self.exit_test()
 
 	# test shared lib with app
 	def test_withapp(self):
+		# Skip shared library tests on Emscripten since this is an advanced feature not supported by Premake yet.
+		if override_compiler == "emcc":
+			return
 		self.enter_test("shared_lib/withapp")
 		self.check_basics("build/bin_debug/ninjatestprj_app", "build/bin_release/ninjatestprj_app")
 		self.out_exist("build/bin_debug/ninjatestprj_lib_test1")
@@ -250,4 +262,9 @@ if __name__ == "__main__":
 	if platform.system() == "Windows" and which("gcc"):
 		print("-------------------------- found gcc on windows")
 		override_compiler = "gcc"
+		unittest.main()
+
+	if which("emcc"):
+		print("-------------------------- found emcc")
+		override_compiler = "emcc"
 		unittest.main()
