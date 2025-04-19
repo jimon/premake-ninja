@@ -22,19 +22,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v4
 
-    - name: checkout premake5
-      uses: actions/checkout@v4
-      with:
-          repository: premake/premake-core
-          path: .bins/premake-build
-
-    - name: Build premake5
-      run: |
-        cd .bins/premake-build
-        make -f Bootstrap.mak osx CONFIG=release
-        cp bin/release/premake5 ../
-        cd ..
-        rm -Rf premake-build
+    - name: install premake5
+      uses: Jarod42/install-premake5@v5
 
     - name: install ninja
       uses: seanmiddleditch/gha-setup-ninja@v6
@@ -42,9 +31,9 @@ jobs:
     - name: Versions
       run: |
         python --version
-        .bins/premake5 --version
+        premake5 --version
         ninja --version
 
     - name: test projects
-      run: cd tests && PATH=$PATH:`pwd`/../.bins python run_tests.py
+      run: cd tests && python run_tests.py
 
