@@ -40,7 +40,7 @@ end
 
 local build_cache = {}
 
-local function add_build(cfg, out, implicit_outputs, command, inputs, implicit_inputs, dependencies, vars)
+function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_inputs, dependencies, vars)
 	implicit_outputs = ninja.list(table.translate(implicit_outputs, ninja.esc))
 	if #implicit_outputs > 0 then
 		implicit_outputs = " |" .. implicit_outputs
@@ -135,6 +135,10 @@ function ninja.shesc(value)
 	return value
 end
 
+function ninja.can_generate(prj)
+	return p.action.supports(prj.kind) and prj.kind ~= p.NONE
+end
+
 -- generate solution that will call ninja for projects
 function ninja.generateWorkspace(wks)
 	local oldGetDefaultSeparator = path.getDefaultSeparator
@@ -152,7 +156,7 @@ function ninja.generateWorkspace(wks)
 	local subninjas = {}
 
 	for prj in p.workspace.eachproject(wks) do
-		if p.action.supports(prj.kind) and prj.kind ~= p.NONE then
+		if ninja.can_generate(prj) then
 			for cfg in p.project.eachconfig(prj) do
 				key = get_key(cfg)
 
@@ -204,6 +208,8 @@ function ninja.generateWorkspace(wks)
 				table.insert(args, arg);
 			end
 		end
+		table.sort(args)
+
 		p.outln('# Rule')
 		p.outln('rule premake')
 		p.outln('  command = ' .. ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' '))
@@ -214,9 +220,11 @@ function ninja.generateWorkspace(wks)
 		p.outln("")
 	end
 
-	p.outln("# default target")
-	p.outln("default " .. ninja.esc(cfg_first))
-	p.outln("")
+	if cfg_first then
+		p.outln("# default target")
+		p.outln("default " .. ninja.esc(cfg_first))
+		p.outln("")
+	end
 
 	path.getDefaultSeparator = oldGetDefaultSeparator
 end
@@ -282,12 +290,15 @@ local function getcxxflags(toolset, cfg, filecfg)
 end
 
 local function getldflags(toolset, cfg)
-	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getldflags(cfg), cfg.linkoptions))
+	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg),
+		toolset.getrunpathdirs(cfg, table.join(cfg.runpathdirs, config.getsiblingtargetdirs(cfg))),
+		toolset.getldflags(cfg), cfg.linkoptions))
 
 	-- experimental feature, change install_name of shared libs
 	--if (toolset == p.tools.clang) and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
 	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
 	--end
+
 	return ldflags
 end
 
@@ -531,7 +542,7 @@ local function pch_build(cfg, pch)
 	local pch_dependency = {}
 	if pch then
 		pch_dependency = { pch.gch }
-		add_build(cfg, pch.gch, {}, "build_pch", {pch.input}, {}, {}, {})
+		ninja.add_build(cfg, pch.gch, {}, "build_pch", {pch.input}, {}, {}, {})
 	end
 	return pch_dependency
 end
@@ -551,7 +562,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 		commands = commands[1]
 	end
 
-	add_build(cfg, output, outputs, "custom_command", {filename}, project.getrelative(prj.workspace, filecfg.buildinputs), file_dependencies,
+	ninja.add_build(cfg, output, outputs, "custom_command", {filename}, project.getrelative(prj.workspace, filecfg.buildinputs), file_dependencies,
 		{"CUSTOM_COMMAND = " .. commands, "CUSTOM_DESCRIPTION = custom build " .. ninja.shesc(output)})
 end
 
@@ -565,7 +576,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		return
 	elseif filecfg.buildaction == "Copy" then
 		local target = project.getrelative(cfg.workspace, path.join(cfg.targetdir, filecfg.name))
-		add_build(cfg, target, {}, "copy", {filepath}, {}, {}, {})
+		ninja.add_build(cfg, target, {}, "copy", {filepath}, {}, {}, {})
 		extrafiles[#extrafiles + 1] = target
 	elseif shouldcompileasc(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
@@ -574,7 +585,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, cflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, cflags)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
 		objfiles[#objfiles + 1] = objfilename
@@ -582,7 +593,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.basename .. ".res"
 		objfiles[#objfiles + 1] = objfilename
@@ -590,7 +601,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			resflags = {"RESFLAGS = $RESFLAGS " .. getresflags(toolset, cfg, filecfg)}
 		end
-		add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, resflags)
+		ninja.add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, resflags)
 	end
 end
 
@@ -631,7 +642,7 @@ local function generated_files_build(cfg, generated_files, key)
 	local final_dependency = {}
 	if #generated_files > 0 then
 		p.outln("# generated files")
-		add_build(cfg, "generated_files_" .. key, {}, "phony", generated_files, {}, {}, {})
+		ninja.add_build(cfg, "generated_files_" .. key, {}, "phony", generated_files, {}, {}, {})
 		final_dependency = {"generated_files_" .. key}
 	end
 	return final_dependency
@@ -700,17 +711,17 @@ function ninja.generateProjectCfg(cfg)
 	---------------------------------------------------- build final target
 	if #cfg.prebuildcommands > 0 or cfg.prebuildmessage then
 		p.outln("# prebuild")
-		add_build(cfg, "prebuild_" .. get_key(cfg), {}, "run_prebuild", {}, {}, {}, {})
+		ninja.add_build(cfg, "prebuild_" .. get_key(cfg), {}, "run_prebuild", {}, {}, {}, {})
 	end
 	local prelink_dependency = {}
 	if #cfg.prelinkcommands > 0 or cfg.prelinkmessage then
 		p.outln("# prelink")
-		add_build(cfg, "prelink_" .. get_key(cfg), {}, "run_prelink", {}, objfiles, final_dependency, {})
+		ninja.add_build(cfg, "prelink_" .. get_key(cfg), {}, "run_prelink", {}, objfiles, final_dependency, {})
 		prelink_dependency = { "prelink_" .. get_key(cfg) }
 	end
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
 		p.outln("# postbuild")
-		add_build(cfg, "postbuild_" .. get_key(cfg), {}, "run_postbuild",  {}, {ninja.outputFilename(cfg)}, {}, {})
+		ninja.add_build(cfg, "postbuild_" .. get_key(cfg), {}, "run_postbuild",  {}, {ninja.outputFilename(cfg)}, {}, {})
 	end
 
 	-- we don't pass getlinks(cfg) through dependencies
@@ -732,13 +743,13 @@ function ninja.generateProjectCfg(cfg)
 	else
 		p.error("ninja action doesn't support this kind of target " .. cfg.kind)
 	end
-	add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, extrafiles, prelink_dependency), {})
+	ninja.add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, table.join(final_dependency, extrafiles, prelink_dependency), {})
 
 	p.outln("")
 	if #cfg.postbuildcommands > 0 or cfg.postbuildmessage then
-		add_build(cfg, key, {}, "phony", {"postbuild_" .. get_key(cfg)}, {}, {}, {})
+		ninja.add_build(cfg, key, {}, "phony", {"postbuild_" .. get_key(cfg)}, {}, {}, {})
 	else
-		add_build(cfg, key, {}, "phony", {cfg_output}, {}, {}, {})
+		ninja.add_build(cfg, key, {}, "phony", {cfg_output}, {}, {}, {})
 	end
 	p.outln("")
 
@@ -772,7 +783,7 @@ end
 
 -- generate all build files for every project configuration
 function ninja.generateProject(prj)
-	if not p.action.supports(prj.kind) or prj.kind == p.NONE then
+	if not ninja.can_generate(prj) then
 		return
 	end
 	for cfg in project.eachconfig(prj) do
