@@ -479,11 +479,15 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		p.outln("  deps = gcc")
 		p.outln("")
 		p.outln("RESFLAGS = " .. all_resflags)
-		p.outln("rule rc")
-		p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
-		p.outln("  description = rc $out")
-		p.outln("")
-		if cfg.kind == p.STATICLIB then
+
+		if rc then
+			p.outln("rule rc")
+			p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
+			p.outln("  description = rc $out")
+			p.outln("")
+		end
+
+		if ar and cfg.kind == p.STATICLIB then
 			p.outln("rule ar")
 			p.outln("  command = " .. ar .. " rcs $out $in")
 			p.outln("  description = ar $out")
@@ -607,7 +611,12 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		if has_custom_settings then
 			resflags = {"RESFLAGS = $RESFLAGS " .. getresflags(toolset, cfg, filecfg)}
 		end
-		ninja.add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, resflags)
+		local rc = toolset.gettoolname(cfg, "rc")
+		if rc then
+			ninja.add_build(cfg, objfilename, {}, "rc", {filepath}, {}, {}, resflags)
+		else
+			p.warnOnce(filepath, string.format("Ignored resource: '%s'", filepath))
+		end
 	end
 end
 
