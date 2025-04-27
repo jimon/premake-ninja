@@ -666,8 +666,8 @@ function ninja.generateProjectCfg(cfg)
 	local is_c_or_cpp = cfg.language == p.C or cfg.language == p.CPP;
 
 	---------------------------------------------------- figure out settings
+	local pch = nil
 	if is_c_or_cpp then
-		local pch = nil
 		if toolset ~= p.tools.msc then
 			pch = p.tools.gcc.getpch(cfg)
 			if pch then
