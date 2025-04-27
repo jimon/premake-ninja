@@ -391,6 +391,33 @@ function ninja.emit_flags(name, value)
 	p.outln(name .. "=" .. value)
 end
 
+ninja.relativeToRoot = true
+
+function get_relative_to_main_script(value)
+	return path.getrelative(_MAIN_SCRIPT_DIR, value)
+end
+
+local previous_premake_tools_getrelative = nil
+
+function setup_premake_project_tools_paths()
+	previous_premake_tools_getrelative = p.tools.getrelative
+
+	if ninja.relativeToRoot then
+		p.tools.getrelative = function(cfg, value)
+			return get_relative_to_main_script(value)
+		end
+	else
+		p.tools.getrelative = function(cfg, value)
+			return p.workspace.getrelative(cfg.workspace, value)
+		end
+	end
+end
+
+function restore_premake_tools_relative_paths()
+	p.tools.getrelative = previous_premake_tools_getrelative
+	previous_premake_tools_getrelative = nil
+end
+
 local function c_cpp_compilation_rules(cfg, toolset, pch)
 	---------------------------------------------------- figure out toolset executables
 	local cc = toolset.gettoolname(cfg, "cc")
@@ -399,14 +426,13 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 	local link = toolset.gettoolname(cfg, iif(cfg.language == "C", "cc", "cxx"))
 	local rc = toolset.gettoolname(cfg, "rc")
 
-	-- all paths need to be relative to the workspace output location,
+	local pch_all_cflags = getcflags(toolset, cfg, cfg)
+	local pch_all_cxxflags = getcxxflags(toolset, cfg, cfg)
+
+	-- all paths need to be relative to the workspace origin or location,
 	-- and not relative to the project output location.
 	-- override the toolset getrelative function to achieve this
-
-	local getrelative = p.tools.getrelative
-	p.tools.getrelative = function(cfg, value)
-		return p.workspace.getrelative(cfg.workspace, value)
-	end
+	setup_premake_project_tools_paths()
 
 	local all_cflags = getcflags(toolset, cfg, cfg)
 	local all_cxxflags = getcxxflags(toolset, cfg, cfg)
@@ -414,19 +440,27 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 	local all_resflags = getresflags(toolset, cfg, cfg)
 
 	local _in, _out = "$in", "$out"
+	local r_in, r_out = _in, _out
+
+	local cd = ""
+	if ninja.relativeToRoot then
+		cd = "cd $SUBDIR &&"
+		r_in = "$RELINFILE"
+		r_out = "$RELOUTFILE"
+	end
 
 	if toolset == p.tools.msc then
 		ninja.emit_flags("CFLAGS", all_cflags)
-		ninja.emit_rule("cc", {cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc".._in, "/Fo".._out}, "cc ".._out, {deps = "msvc"})
+		ninja.emit_rule("cc", {cd, cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc"..r_in, "/Fo"..r_out}, "cc "..r_out, {deps = "msvc"})
 
 		ninja.emit_flags("CXXFLAGS", all_cxxflags)
-		ninja.emit_rule("cxx", {cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp".._in, "/Fo".._out}, "cxx ".._out, {deps = "msvc"})
+		ninja.emit_rule("cxx", {cd, cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp"..r_in, "/Fo"..r_out}, "cxx "..r_out, {deps = "msvc"})
 
 		ninja.emit_flags("CFLAGS", all_cflags)
-		ninja.emit_rule("clangtidy_cc", {"clang-tidy", _in, "--", "-x", "c", "$CFLAGS", "&&$", cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc".._in, "/Fo".._out}, "cc ".._out, {deps = "msvc"})
+		ninja.emit_rule("clangtidy_cc", {cd, "clang-tidy", r_in, "--", "-x", "c", "$CFLAGS", "&&$", cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc"..r_in, "/Fo"..r_out}, "cc "..r_out, {deps = "msvc"})
 
 		ninja.emit_flags("CXXFLAGS", all_cxxflags)
-		ninja.emit_rule("clangtidy_cxx", {"clang-tidy", _in, "--", "-x", "c++", "$CFLAGS", "&&$", cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp".._in, "/Fo".._out}, "cxx ".._out, {deps = "msvc"})
+		ninja.emit_rule("clangtidy_cxx", {cd, "clang-tidy", r_in, "--", "-x", "c++", "$CFLAGS", "&&$", cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp"..r_in, "/Fo"..r_out}, "cxx "..r_out, {deps = "msvc"})
 
 		ninja.emit_flags("RESFLAGS", all_resflags)
 		ninja.emit_rule("rc", {rc, "/nologo", "/fo".._out, _in, "$RESFLAGS"}, "rc ".._out)
@@ -437,26 +471,31 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 			ninja.emit_rule("link", {link, _in .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))), "/link" .. all_ldflags, "/nologo", "/out:".._out}, "link ".._out)
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
-		local force_include = pch and (" -include " .. ninja.shesc(pch.placeholder)) or ""
+		local pch_placeholder = pch and pch.placeholder or ""
+		if ninja.relativeToRoot then
+			pch_placeholder = path.join(cfg.workspace.location, pch_placeholder)
+			pch_placeholder = get_relative_to_main_script(pch_placeholder)
+		end
+		local force_include = pch and (" -include " .. ninja.shesc(pch_placeholder)) or ""
 
 		if pch then
 			ninja.emit_rule("build_pch", {
-				iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header"),
+				iif(cfg.language == "C", cc .. pch_all_cflags .. " -x c-header", cxx .. pch_all_cxxflags .. " -x c++-header"),
 				"-H", "-MF", _out..".d", "-c", "-o", _out, _in
-			}, "build_pch ".._out, {depfile = _out..".d", deps = "gcc"})
+			}, "build_pch "..r_out, {depfile = _out..".d", deps = "gcc"})
 		end
 
 		ninja.emit_flags("CFLAGS", all_cflags)
-		ninja.emit_rule("cc", {cc, "$CFLAGS"..force_include, "-x", "c", "-MF", _out..".d", "-c", "-o", _out, _in}, "cc ".._out, {depfile = _out..".d", deps = "gcc"})
+		ninja.emit_rule("cc", {cd, cc, "$CFLAGS"..force_include, "-x", "c", "-MF", r_out..".d", "-c", "-o", r_out, r_in}, "cc "..r_out, {depfile = r_out..".d", deps = "gcc"})
 
 		ninja.emit_flags("CXXFLAGS", all_cxxflags)
-		ninja.emit_rule("cxx", {cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", _out..".d", "-c", "-o", _out, _in}, "cxx ".._out, {depfile = _out..".d", deps = "gcc"})
+		ninja.emit_rule("cxx", {cd, cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", r_out..".d", "-c", "-o", r_out, r_in}, "cxx "..r_out, {depfile = r_out..".d", deps = "gcc"})
 
 		ninja.emit_flags("CFLAGS", all_cflags)
-		ninja.emit_rule("clangtidy_cc", {"clang-tidy", _in, "--", "-x", "c", "$CFLAGS"..force_include, "&&$", cc, "$CFLAGS"..force_include, "-x", "c", "-MF", _out..".d", "-c", "-o", _out, _in}, "cc ".._out, {depfile = _out..".d", deps = "gcc"})
+		ninja.emit_rule("clangtidy_cc", {cd, "clang-tidy", r_in, "--", "-x", "c", "$CFLAGS"..force_include, "&&$", cc, "$CFLAGS"..force_include, "-x", "c", "-MF", r_out..".d", "-c", "-o", r_out, r_in}, "cc "..r_out, {depfile = r_out..".d", deps = "gcc"})
 
 		ninja.emit_flags("CXXFLAGS", all_cxxflags)
-		ninja.emit_rule("clangtidy_cxx", {"clang-tidy", _in, "--", "-x", "c++", "$CFLAGS"..force_include, "&&$", cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", _out..".d", "-c", "-o", _out, _in}, "cxx ".._out, {depfile = _out..".d", deps = "gcc"})
+		ninja.emit_rule("clangtidy_cxx", {cd, "clang-tidy", r_in, "--", "-x", "c++", "$CFLAGS"..force_include, "&&$", cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", r_out..".d", "-c", "-o", r_out, r_in}, "cxx "..r_out, {depfile = r_out..".d", deps = "gcc"})
 
 		ninja.emit_flags("RESFLAGS", all_resflags)
 		if rc then
@@ -473,7 +512,7 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		end
 	end
 
-	p.tools.getrelative = getrelative
+	restore_premake_tools_relative_paths()
 end
 
 local function custom_command_rule()
@@ -552,6 +591,21 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local obj_file = filecfg.objname .. (toolset.objectextension or ".o")
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
+
+	local extravars = {}
+	if ninja.relativeToRoot then
+		local subdir = project.getrelative(cfg.workspace, _MAIN_SCRIPT_DIR)
+		subdirvar = "SUBDIR = " .. ninja.shesc(subdir)
+
+		local relinfile = get_relative_to_main_script(filecfg.abspath)
+		relinfile = "RELINFILE = " .. ninja.shesc(relinfile)
+
+		local reloutfile = path.join(cfg.workspace.location, cfg.objdir, obj_file)
+		local reloutfile = get_relative_to_main_script(reloutfile)
+		reloutfile = "RELOUTFILE = " .. ninja.shesc(reloutfile)
+		extravars = { subdirvar, relinfile, reloutfile }
+	end
+
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 	local use_clangtidy = filecfg.clangtidy or (filecfg.clangtidy == nil and cfg.clangtidy)
 
@@ -569,6 +623,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 			cflags = "CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)
 			vars = { cflags }
 		end
+		vars = table.join(vars, extravars)
 		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif shouldcompileascpp(filecfg) then
 		local objfilename = obj_dir .. "/" .. obj_file
@@ -578,6 +633,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 			cxxflags = "CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)
 			vars = { cxxflags }
 		end
+		vars = table.join(vars, extravars)
 		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.basename .. ".res"
@@ -665,20 +721,25 @@ function ninja.generateProjectCfg(cfg)
 
 	local is_c_or_cpp = cfg.language == p.C or cfg.language == p.CPP;
 
+	-- setup_premake_project_tools_paths()
+
 	---------------------------------------------------- figure out settings
 	local pch = nil
 	if is_c_or_cpp then
 		if toolset ~= p.tools.msc then
 			pch = p.tools.gcc.getpch(cfg)
 			if pch then
+				local placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch)))
 				pch = {
 					input = pch,
-					placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
-					gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. ".gch"))
+					placeholder = placeholder,
+					gch = placeholder..".gch"
 				}
 			end
 		end
 	end
+
+	-- restore_premake_tools_relative_paths()
 
 	---------------------------------------------------- write rules
 	p.outln("# core rules for " .. cfg.name)
