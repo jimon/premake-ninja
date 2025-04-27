@@ -549,6 +549,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 end
 
 local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles, extrafiles)
+	local obj_file = filecfg.objname .. (toolset.objectextension or ".o")
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
@@ -561,21 +562,23 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		ninja.add_build(cfg, target, {}, "copy", {filepath}, {}, {}, {})
 		extrafiles[#extrafiles + 1] = target
 	elseif shouldcompileasc(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
+		local objfilename = obj_dir .. "/" .. obj_file
 		objfiles[#objfiles + 1] = objfilename
-		local cflags = {}
+		local vars = {}
 		if has_custom_settings then
-			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
+			cflags = "CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)
+			vars = { cflags }
 		end
-		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, cflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif shouldcompileascpp(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
+		local objfilename = obj_dir .. "/" .. obj_file
 		objfiles[#objfiles + 1] = objfilename
-		local cxxflags = {}
+		local vars = {}
 		if has_custom_settings then
-			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
+			cxxflags = "CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)
+			vars = { cxxflags }
 		end
-		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.basename .. ".res"
 		objfiles[#objfiles + 1] = objfilename
