@@ -135,7 +135,7 @@ function ninja.shesc(value)
 		return result
 	end
 
-	if value:find(" ") then
+	if value:find(' ') or value:find('"') or value:find('(', 1, true) or value:find(')') or value:find('|') or value:find('&') then
 		return ninja.quote(value)
 	end
 	return value
@@ -275,23 +275,28 @@ local function getFileDependencies(cfg)
 end
 
 local function getcflags(toolset, cfg, filecfg)
+	p.escaper(ninja.shesc)
 	local buildopt = ninja.list(filecfg.buildoptions)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cflags = ninja.list(toolset.getcflags(filecfg))
-	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
+	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines, filecfg), toolset.getundefines(filecfg.undefines)))
 	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
+	p.escaper(nil)
 
 	return buildopt .. cppflags .. cflags .. defines .. includes .. forceincludes
 end
 
 local function getcxxflags(toolset, cfg, filecfg)
+	p.escaper(ninja.shesc)
 	local buildopt = ninja.list(filecfg.buildoptions)
 	local cppflags = ninja.list(toolset.getcppflags(filecfg))
 	local cxxflags = ninja.list(toolset.getcxxflags(filecfg))
-	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines), toolset.getundefines(filecfg.undefines)))
+	local defines = ninja.list(table.join(toolset.getdefines(filecfg.defines, filecfg), toolset.getundefines(filecfg.undefines)))
 	local includes = ninja.list(toolset.getincludedirs(cfg, filecfg.includedirs, filecfg.externalincludedirs, filecfg.frameworkdirs, filecfg.includedirsafter))
 	local forceincludes = ninja.list(toolset.getforceincludes(cfg))
+	p.escaper(nil)
+
 	return buildopt .. cppflags .. cxxflags .. defines .. includes .. forceincludes
 end
 
@@ -309,9 +314,11 @@ local function getldflags(toolset, cfg)
 end
 
 local function getresflags(toolset, cfg, filecfg)
-	local defines = ninja.list(toolset.getdefines(table.join(filecfg.defines, filecfg.resdefines)))
+	p.escaper(ninja.shesc)
+	local defines = ninja.list(toolset.getdefines(table.join(filecfg.defines, filecfg.resdefines), filecfg))
 	local includes = ninja.list(toolset.getincludedirs(cfg, table.join(filecfg.externalincludedirs, filecfg.includedirsafter, filecfg.includedirs, filecfg.resincludedirs), {}, {}, {}))
 	local options = ninja.list(cfg.resoptions)
+	p.escaper(nil)
 
 	return defines .. includes .. options
 end
