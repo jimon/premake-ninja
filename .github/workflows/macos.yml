@@ -25,7 +25,7 @@ jobs:
     - uses: mymindstorm/setup-emsdk@v14
 
     - name: install premake5
-      uses: Jarod42/install-premake5@v5
+      uses: Jarod42/install-premake5@v6
 
     - name: install ninja
       uses: seanmiddleditch/gha-setup-ninja@v6
