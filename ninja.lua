@@ -380,6 +380,24 @@ local function postbuild_rule(cfg)
 	end
 end
 
+function ninja.emit_rule(name, cmd_parts, description, opts)
+	opts = opts or {}
+	p.outln("rule " .. name)
+	p.outln("  command = " .. table.concat(cmd_parts, " "))
+	p.outln("  description = " .. description)
+	if opts.deps then
+		p.outln("  deps = " .. opts.deps)
+	end
+	if opts.depfile then
+		p.outln("  depfile = " .. opts.depfile)
+	end
+	p.outln("")
+end
+
+function ninja.emit_flags(name, value)
+	p.outln(name .. "=" .. value)
+end
+
 local function c_cpp_compilation_rules(cfg, toolset, pch)
 	---------------------------------------------------- figure out toolset executables
 	local cc = toolset.gettoolname(cfg, "cc")
@@ -402,109 +420,63 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 	local all_ldflags = getldflags(toolset, cfg)
 	local all_resflags = getresflags(toolset, cfg, cfg)
 
+	local _in, _out = "$in", "$out"
+
 	if toolset == p.tools.msc then
-		p.outln("CFLAGS=" .. all_cflags)
-		p.outln("rule cc")
-		p.outln("  command = " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
-		p.outln("  description = cc $out")
-		p.outln("  deps = msvc")
-		p.outln("")
-		p.outln("CXXFLAGS=" .. all_cxxflags)
-		p.outln("rule cxx")
-		p.outln("  command = " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
-		p.outln("  description = cxx $out")
-		p.outln("  deps = msvc")
-		p.outln("")
-		p.outln("CFLAGS=" .. all_cflags)
-		p.outln("rule clangtidy_cc")
-		p.outln("  command = clang-tidy $in -- -x c $CFLAGS &&$")
-		p.outln("            " .. cc .. " $CFLAGS" .. " /nologo /showIncludes -c /Tc$in /Fo$out")
-		p.outln("  description = cc $out")
-		p.outln("  deps = msvc")
-		p.outln("")
-		p.outln("CXXFLAGS=" .. all_cxxflags)
-		p.outln("rule clangtidy_cxx")
-		p.outln("  command = clang-tidy $in -- -x c++ $CFLAGS &&$")
-		p.outln("            " .. cxx .. " $CXXFLAGS" .. " /nologo /showIncludes -c /Tp$in /Fo$out")
-		p.outln("  description = cxx $out")
-		p.outln("  deps = msvc")
-		p.outln("")
-		p.outln("RESFLAGS = " .. all_resflags)
-		p.outln("rule rc")
-		p.outln("  command = " .. rc .. " /nologo /fo$out $in $RESFLAGS")
-		p.outln("  description = rc $out")
-		p.outln("")
+		ninja.emit_flags("CFLAGS", all_cflags)
+		ninja.emit_rule("cc", {cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc".._in, "/Fo".._out}, "cc ".._out, {deps = "msvc"})
+
+		ninja.emit_flags("CXXFLAGS", all_cxxflags)
+		ninja.emit_rule("cxx", {cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp".._in, "/Fo".._out}, "cxx ".._out, {deps = "msvc"})
+
+		ninja.emit_flags("CFLAGS", all_cflags)
+		ninja.emit_rule("clangtidy_cc", {"clang-tidy", _in, "--", "-x", "c", "$CFLAGS", "&&$", cc, "$CFLAGS", "/nologo", "/showIncludes", "-c", "/Tc".._in, "/Fo".._out}, "cc ".._out, {deps = "msvc"})
+
+		ninja.emit_flags("CXXFLAGS", all_cxxflags)
+		ninja.emit_rule("clangtidy_cxx", {"clang-tidy", _in, "--", "-x", "c++", "$CFLAGS", "&&$", cxx, "$CXXFLAGS", "/nologo", "/showIncludes", "-c", "/Tp".._in, "/Fo".._out}, "cxx ".._out, {deps = "msvc"})
+
+		ninja.emit_flags("RESFLAGS", all_resflags)
+		ninja.emit_rule("rc", {rc, "/nologo", "/fo".._out, _in, "$RESFLAGS"}, "rc ".._out)
+
 		if cfg.kind == p.STATICLIB then
-			p.outln("rule ar")
-			p.outln("  command = " .. ar .. " $in /nologo -OUT:$out")
-			p.outln("  description = ar $out")
-			p.outln("")
+			ninja.emit_rule("ar", {ar, _in, "/nologo", "-OUT:".._out}, "ar ".._out)
 		else
-			p.outln("rule link")
-			p.outln("  command = " .. link .. " $in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. " /link" .. all_ldflags .. " /nologo /out:$out")
-			p.outln("  description = link $out")
-			p.outln("")
+			ninja.emit_rule("link", {link, _in .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))), "/link" .. all_ldflags, "/nologo", "/out:".._out}, "link ".._out)
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
-		local force_include_pch = ""
-		if pch then
-			force_include_pch = " -include " .. ninja.shesc(pch.placeholder)
-			p.outln("rule build_pch")
-			p.outln("  command = " .. iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header")  .. " -H -MF $out.d -c -o $out $in")
-			p.outln("  description = build_pch $out")
-			p.outln("  depfile = $out.d")
-			p.outln("  deps = gcc")
-		end
-		p.outln("CFLAGS=" .. all_cflags)
-		p.outln("rule cc")
-		p.outln("  command = " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MF $out.d -c -o $out $in")
-		p.outln("  description = cc $out")
-		p.outln("  depfile = $out.d")
-		p.outln("  deps = gcc")
-		p.outln("")
-		p.outln("CXXFLAGS=" .. all_cxxflags)
-		p.outln("rule cxx")
-		p.outln("  command = " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MF $out.d -c -o $out $in")
-		p.outln("  description = cxx $out")
-		p.outln("  depfile = $out.d")
-		p.outln("  deps = gcc")
-		p.outln("")
-		p.outln("CFLAGS=" .. all_cflags)
-		p.outln("rule clangtidy_cc")
-		p.outln("  command = clang-tidy $in -- -x c $CFLAGS"  .. force_include_pch .. " &&$")
-		p.outln("            " .. cc .. " $CFLAGS" .. force_include_pch .. " -x c -MF $out.d -c -o $out $in")
-		p.outln("  description = cc $out")
-		p.outln("  depfile = $out.d")
-		p.outln("  deps = gcc")
-		p.outln("")
-		p.outln("CXXFLAGS=" .. all_cxxflags)
-		p.outln("rule clangtidy_cxx")
-		p.outln("  command = clang-tidy $in -- -x c++ $CFLAGS"  .. force_include_pch .. " &&$")
-		p.outln("            " .. cxx .. " $CXXFLAGS" .. force_include_pch .. " -x c++ -MF $out.d -c -o $out $in")
-		p.outln("  description = cxx $out")
-		p.outln("  depfile = $out.d")
-		p.outln("  deps = gcc")
-		p.outln("")
-		p.outln("RESFLAGS = " .. all_resflags)
+		local force_include = pch and (" -include " .. ninja.shesc(pch.placeholder)) or ""
 
+		if pch then
+			ninja.emit_rule("build_pch", {
+				iif(cfg.language == "C", cc .. all_cflags .. " -x c-header", cxx .. all_cxxflags .. " -x c++-header"),
+				"-H", "-MF", _out..".d", "-c", "-o", _out, _in
+			}, "build_pch ".._out, {depfile = _out..".d", deps = "gcc"})
+		end
+
+		ninja.emit_flags("CFLAGS", all_cflags)
+		ninja.emit_rule("cc", {cc, "$CFLAGS"..force_include, "-x", "c", "-MF", _out..".d", "-c", "-o", _out, _in}, "cc ".._out, {depfile = _out..".d", deps = "gcc"})
+
+		ninja.emit_flags("CXXFLAGS", all_cxxflags)
+		ninja.emit_rule("cxx", {cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", _out..".d", "-c", "-o", _out, _in}, "cxx ".._out, {depfile = _out..".d", deps = "gcc"})
+
+		ninja.emit_flags("CFLAGS", all_cflags)
+		ninja.emit_rule("clangtidy_cc", {"clang-tidy", _in, "--", "-x", "c", "$CFLAGS"..force_include, "&&$", cc, "$CFLAGS"..force_include, "-x", "c", "-MF", _out..".d", "-c", "-o", _out, _in}, "cc ".._out, {depfile = _out..".d", deps = "gcc"})
+
+		ninja.emit_flags("CXXFLAGS", all_cxxflags)
+		ninja.emit_rule("clangtidy_cxx", {"clang-tidy", _in, "--", "-x", "c++", "$CFLAGS"..force_include, "&&$", cxx, "$CXXFLAGS"..force_include, "-x", "c++", "-MF", _out..".d", "-c", "-o", _out, _in}, "cxx ".._out, {depfile = _out..".d", deps = "gcc"})
+
+		ninja.emit_flags("RESFLAGS", all_resflags)
 		if rc then
-			p.outln("rule rc")
-			p.outln("  command = " .. rc .. " -i $in -o $out $RESFLAGS")
-			p.outln("  description = rc $out")
-			p.outln("")
+			ninja.emit_rule("rc", {rc, "-i", _in, "-o", _out, "$RESFLAGS"}, "rc ".._out)
 		end
 
 		if ar and cfg.kind == p.STATICLIB then
-			p.outln("rule ar")
-			p.outln("  command = " .. ar .. " rcs $out $in")
-			p.outln("  description = ar $out")
-			p.outln("")
+			ninja.emit_rule("ar", {ar, "rcs", _out, _in}, "ar ".._out)
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, {"-Wl,--start-group ", " -Wl,--end-group"}, {"", ""})
-			p.outln("rule link")
-			p.outln("  command = " .. link .. " -o $out " .. groups[1] .. "$in" .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2])
-			p.outln("  description = link $out")
-			p.outln("")
+			ninja.emit_rule("link", {
+				link, "-o", _out, groups[1] .. _in .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2]
+			}, "link ".._out)
 		end
 	end
 
@@ -584,6 +556,7 @@ local function custom_command_build(prj, cfg, filecfg, filename, file_dependenci
 end
 
 local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular_file_dependencies, objfiles, extrafiles)
+	local obj_file = filecfg.objname .. (toolset.objectextension or ".o")
 	local obj_dir = project.getrelative(cfg.workspace, cfg.objdir)
 	local filepath = project.getrelative(cfg.workspace, filecfg.abspath)
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
@@ -596,21 +569,23 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		ninja.add_build(cfg, target, {}, "copy", {filepath}, {}, {}, {})
 		extrafiles[#extrafiles + 1] = target
 	elseif shouldcompileasc(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
+		local objfilename = obj_dir .. "/" .. obj_file
 		objfiles[#objfiles + 1] = objfilename
-		local cflags = {}
+		local vars = {}
 		if has_custom_settings then
-			cflags = {"CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)}
+			cflags = "CFLAGS = $CFLAGS " .. getcflags(toolset, cfg, filecfg)
+			vars = { cflags }
 		end
-		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, cflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cc", "cc"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif shouldcompileascpp(filecfg) then
-		local objfilename = obj_dir .. "/" .. filecfg.objname .. (toolset.objectextension or ".o")
+		local objfilename = obj_dir .. "/" .. obj_file
 		objfiles[#objfiles + 1] = objfilename
-		local cxxflags = {}
+		local vars = {}
 		if has_custom_settings then
-			cxxflags = {"CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)}
+			cxxflags = "CXXFLAGS = $CXXFLAGS " .. getcxxflags(toolset, cfg, filecfg)
+			vars = { cxxflags }
 		end
-		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, cxxflags)
+		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, "clangtidy_cxx", "cxx"), {filepath}, pch_dependency, regular_file_dependencies, vars)
 	elseif path.isresourcefile(filecfg.abspath) then
 		local objfilename = obj_dir .. "/" .. filecfg.basename .. ".res"
 		objfiles[#objfiles + 1] = objfilename
