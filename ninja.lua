@@ -107,6 +107,24 @@ function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 	}
 end
 
+function ninja.emit_rule(name, cmd_parts, description, opts)
+	opts = opts or {}
+	p.outln("rule " .. name)
+	p.outln("  command = " .. table.concat(cmd_parts, " "))
+	p.outln("  description = " .. description)
+	if opts.deps then
+		p.outln("  deps = " .. opts.deps)
+	end
+	if opts.depfile then
+		p.outln("  depfile = " .. opts.depfile)
+	end
+	p.outln("")
+end
+
+function ninja.emit_flags(name, value)
+	p.outln(name .. "=" .. value)
+end
+
 function ninja.esc(value)
 	value = value:gsub("%$", "$$") -- TODO maybe there is better way
 	value = value:gsub(":", "$:")
@@ -335,10 +353,7 @@ local function prebuild_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.outln("rule run_prebuild")
-		p.outln("  command = " .. commands)
-		p.outln("  description = prebuild")
-		p.outln("")
+		ninja.emit_rule("run_prebuild", { commands }, "prebuild")
 	end
 end
 
@@ -354,10 +369,7 @@ local function prelink_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.outln("rule run_prelink")
-		p.outln("  command = " .. commands)
-		p.outln("  description = prelink")
-		p.outln("")
+		ninja.emit_rule("run_prelink", { commands }, "prelink")
 	end
 end
 
@@ -373,29 +385,8 @@ local function postbuild_rule(cfg)
 		else
 			commands = commands[1]
 		end
-		p.outln("rule run_postbuild")
-		p.outln("  command = " .. commands)
-		p.outln("  description = postbuild")
-		p.outln("")
+		ninja.emit_rule("run_postbuild", { commands }, "postbuild")
 	end
-end
-
-function ninja.emit_rule(name, cmd_parts, description, opts)
-	opts = opts or {}
-	p.outln("rule " .. name)
-	p.outln("  command = " .. table.concat(cmd_parts, " "))
-	p.outln("  description = " .. description)
-	if opts.deps then
-		p.outln("  deps = " .. opts.deps)
-	end
-	if opts.depfile then
-		p.outln("  depfile = " .. opts.depfile)
-	end
-	p.outln("")
-end
-
-function ninja.emit_flags(name, value)
-	p.outln(name .. "=" .. value)
 end
 
 local function c_cpp_compilation_rules(cfg, toolset, pch)
@@ -484,17 +475,11 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 end
 
 local function custom_command_rule()
-	p.outln("rule custom_command")
-	p.outln("  command = $CUSTOM_COMMAND")
-	p.outln("  description = $CUSTOM_DESCRIPTION")
-	p.outln("")
+	ninja.emit_rule("custom_command", {"$CUSTOM_COMMAND"}, "$CUSTOM_DESCRIPTION")
 end
 
 local function copy_rule()
-	p.outln("rule copy")
-	p.outln("  command = " .. os.translateCommands("{COPYFILE} $in $out"))
-	p.outln("  description = copy $in $out")
-	p.outln("")
+	ninja.emit_rule("copy", { os.translateCommands("{COPYFILE} $in $out") }, "copy $in $out")
 end
 
 local function collect_generated_files(prj, cfg)
