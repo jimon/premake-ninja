@@ -105,10 +105,10 @@ function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 	}
 end
 
-function ninja.emit_rule(name, cmd_parts, description, opts)
+function ninja.emit_rule(name, cmds, description, opts)
 	opts = opts or {}
 	p.outln('rule ' .. name)
-	p.outln('  command = ' .. table.concat(cmd_parts, ' '))
+	p.outln('  command = ' .. table.concat(cmds, ' &&$\n            '))
 	p.outln('  description = ' .. description)
 	if opts.deps then
 		p.outln('  deps = ' .. opts.deps)
@@ -412,58 +412,56 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 	local all_ldflags = getldflags(toolset, cfg)
 	local all_resflags = getresflags(toolset, cfg, cfg)
 
-	local _in, _out = '$in', '$out'
-
 	if toolset == p.tools.msc then
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('cc', { cc, '$CFLAGS', '/nologo', '/showIncludes', '-c', '/Tc$in', '/Fo$out' }, 'cc $out', { deps = 'msvc' })
+		ninja.emit_rule('cc', { cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out' }, 'cc $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('cxx', { cxx, '$CXXFLAGS', '/nologo', '/showIncludes', '-c', '/Tp$in', '/Fo$out' }, 'cxx $out', { deps = 'msvc' })
+		ninja.emit_rule('cxx', { cxx .. ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('clangtidy_cc', { 'clang-tidy', _in, '--', '-x', 'c', '$CFLAGS', '&&$', cc, '$CFLAGS', '/nologo', '/showIncludes', '-c', '/Tc$in', '/Fo$out' }, 'cc $out', { deps = 'msvc' })
+		ninja.emit_rule('clangtidy_cc', { 'clang-tidy $in -- -x c $CFLAGS', cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out' }, 'cc $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy', _in, '--', '-x', 'c++', '$CFLAGS', '&&$', cxx, '$CXXFLAGS', '/nologo', '/showIncludes', '-c', '/Tp$in', '/Fo$out' }, 'cxx $out', { deps = 'msvc' })
+		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS', cxx ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
-		ninja.emit_rule('rc', { rc, '/nologo', '/fo$out', _in, '$RESFLAGS' }, 'rc $out')
+		ninja.emit_rule('rc', { rc .. ' /nologo /fo$out $in $RESFLAGS' }, 'rc $out')
 
 		if cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', { ar, _in, '/nologo', '-OUT:$out' }, 'ar $out')
+			ninja.emit_rule('ar', { ar .. ' $in /nologo -OUT:$out' }, 'ar $out')
 		else
-			ninja.emit_rule('link', { link, _in .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))), '/link' .. all_ldflags, '/nologo', '/out:$out' }, 'link $out')
+			ninja.emit_rule('link', { link .. ' $in '.. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out' }, 'link $out')
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include = pch and (' -include ' .. ninja.shesc(pch.placeholder)) or ''
 
 		if pch then
-			ninja.emit_rule('build_pch', { iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header'), '-H', '-MF', '$out.d', '-c', '-o', _out, _in }, 'build_pch ' .. _out, { depfile = '$out.d', deps = 'gcc' })
+			ninja.emit_rule('build_pch', { iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header') .. '-H -MF $out.d -c -o $out $in' }, 'build_pch $out', { depfile = '$out.d', deps = 'gcc' })
 		end
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('cc', { cc, '$CFLAGS' .. force_include, '-x', 'c', '-MF', '$out.d', '-c', '-o', _out, _in }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('cc', { cc .. ' $CFLAGS' .. force_include .. ' -x c -MF $out.d -c -o $out $in' }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('cxx', { cxx, '$CXXFLAGS' .. force_include, '-x', 'c++', '-MF', '$out.d', '-c', '-o', _out, _in }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('cxx', { cxx .. ' $CXXFLAGS' .. force_include .. ' -x c++ -MF $out.d -c -o $out $in' }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('clangtidy_cc', { 'clang-tidy', _in, '--', '-x', 'c', '$CFLAGS' .. force_include, '&&$', cc, '$CFLAGS' .. force_include, '-x', 'c', '-MF', '$out.d', '-c', '-o', _out, _in }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('clangtidy_cc', { 'clang-tidy $in -- -x c $CFLAGS' .. force_include, cc .. ' $CFLAGS' .. force_include .. ' -x c -MF $out.d -c -o $out $in' }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy', _in, '--', '-x', 'c++', '$CFLAGS' .. force_include, '&&$', cxx, '$CXXFLAGS' .. force_include, '-x', 'c++', '-MF', '$out.d', '-c', '-o', _out, _in }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS' .. force_include, cxx .. ' $CXXFLAGS' .. force_include .. '-x c++ -MF $out.d -c -o $out $in' }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
 		if rc then
-			ninja.emit_rule('rc', { rc, '-i', _in, '-o', _out, '$RESFLAGS' }, 'rc $out')
+			ninja.emit_rule('rc', { rc .. ' -i $in -o $out $RESFLAGS' }, 'rc $out')
 		end
 
 		if ar and cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', { ar, 'rcs', _out, _in }, 'ar $out')
+			ninja.emit_rule('ar', { ar .. ' rcs $out $in' }, 'ar $out')
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, { '-Wl,--start-group ', ' -Wl,--end-group' }, { '', '' })
-			ninja.emit_rule('link', { link, '-o', _out, groups[1] .. _in .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2] }, 'link $out')
+			ninja.emit_rule('link', { link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2] }, 'link $out')
 		end
 	end
 
