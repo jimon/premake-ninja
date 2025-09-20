@@ -1,4 +1,4 @@
 return {
-	"_preload.lua",
-	"ninja.lua",
+	'_preload.lua',
+	'ninja.lua',
 }

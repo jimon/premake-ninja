@@ -1,0 +1,27 @@
+name: formatting
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/formatting.yml'
+      - '*.lua'
+
+  pull_request:
+    paths:
+      - '.github/workflows/formatting.yml'
+      - '*.lua'
+
+jobs:
+  ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - uses: JohnnyMorganz/stylua-action@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        version: latest
+        args: --check -- .
