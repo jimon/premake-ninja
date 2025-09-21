@@ -416,7 +416,7 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		ninja.emit_rule('clangtidy_cc', { 'clang-tidy $in -- -x c $CFLAGS', cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out' }, 'cc $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS', cxx ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
+		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS', cxx .. ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
 		ninja.emit_rule('rc', { rc .. ' /nologo /fo$out $in $RESFLAGS' }, 'rc $out')
@@ -424,13 +424,13 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		if cfg.kind == p.STATICLIB then
 			ninja.emit_rule('ar', { ar .. ' $in /nologo -OUT:$out' }, 'ar $out')
 		else
-			ninja.emit_rule('link', { link .. ' $in '.. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out' }, 'link $out')
+			ninja.emit_rule('link', { link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out' }, 'link $out')
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include = pch and (' -include ' .. ninja.shesc(pch.placeholder)) or ''
 
 		if pch then
-			ninja.emit_rule('build_pch', { iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header') .. '-H -MF $out.d -c -o $out $in' }, 'build_pch $out', { depfile = '$out.d', deps = 'gcc' })
+			ninja.emit_rule('build_pch', { iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header') .. ' -H -MF $out.d -c -o $out $in' }, 'build_pch $out', { depfile = '$out.d', deps = 'gcc' })
 		end
 
 		ninja.emit_flags('CFLAGS', all_cflags)
