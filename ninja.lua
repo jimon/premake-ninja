@@ -79,12 +79,12 @@ function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 			if command == 'custom_command' or command == 'copy' then
 				p.outln('# INFO: Rule ignored, same as ' .. cached.cfg_key)
 			else
-				local cfg_key = get_key(cfg)
+				local cfg_key = cfg and get_key(cfg) or 'Global scope'
 				p.warn(cached.cfg_key .. ' and ' .. cfg_key .. ' both generate (differently?) ' .. out .. '. Ignoring ' .. cfg_key)
 				p.outln('# WARNING: Rule ignored, using the one from ' .. cached.cfg_key)
 			end
 		else
-			local cfg_key = get_key(cfg)
+			local cfg_key = cfg and get_key(cfg) or 'Global scope'
 			p.warn(cached.cfg_key .. ' and ' .. cfg_key .. ' both generate differently ' .. out .. '. Ignoring ' .. cfg_key)
 			p.outln('# ERROR: Rule ignored, using the one from ' .. cached.cfg_key)
 		end
@@ -99,7 +99,7 @@ function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 		p.outln('  ' .. var)
 	end
 	build_cache[out] = {
-		cfg_key = get_key(cfg),
+		cfg_key = cfg and get_key(cfg) or 'Global scope',
 		build_line = build_line,
 		vars = vars,
 	}
@@ -110,11 +110,8 @@ function ninja.emit_rule(name, cmds, description, opts)
 	p.outln('rule ' .. name)
 	p.outln('  command = ' .. table.concat(cmds, ' &&$\n            '))
 	p.outln('  description = ' .. description)
-	if opts.deps then
-		p.outln('  deps = ' .. opts.deps)
-	end
-	if opts.depfile then
-		p.outln('  depfile = ' .. opts.depfile)
+	for key, value in pairs(opts) do
+		p.outln('  ' .. key .. ' = ' .. value)
 	end
 	p.outln('')
 end
@@ -239,12 +236,8 @@ function ninja.generateWorkspace(wks)
 		table.sort(args)
 
 		p.outln('# Rule')
-		p.outln('rule premake')
-		p.outln('  command = ' .. ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' '))
-		p.outln('  generator = true')
-		p.outln('  restat = true')
-		p.outln('')
-		p.outln('build build.ninja ' .. table.concat(subninjas, ' ') .. ': premake ' .. p.workspace.getrelative(wks, _MAIN_SCRIPT))
+		ninja.emit_rule('premake', { ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' ') }, 'run premake', { generator = 'true', restat = 'true' })
+		ninja.add_build(nil, 'build.ninja', subninjas, 'premake', { p.workspace.getrelative(wks, _MAIN_SCRIPT) }, {}, {}, {})
 		p.outln('')
 	end
 
