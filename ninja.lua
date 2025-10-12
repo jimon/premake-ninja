@@ -140,12 +140,7 @@ end
 -- so we need to propely escape them
 function ninja.shesc(value)
 	if type(value) == 'table' then
-		local result = {}
-		local n = #value
-		for i = 1, n do
-			table.insert(result, ninja.shesc(value[i]))
-		end
-		return result
+		return table.translate(value, ninja.shesc)
 	end
 
 	if value:find(' ') or value:find('"') or value:find('(', 1, true) or value:find(')') or value:find('|') or value:find('&') then
@@ -546,8 +541,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		objfiles[#objfiles + 1] = objfilename
 		local vars = {}
 		if has_custom_settings then
-			cflags = 'CFLAGS = $CFLAGS ' .. getcflags(toolset, cfg, filecfg)
-			vars = { cflags }
+			vars = { 'CFLAGS = $CFLAGS ' .. getcflags(toolset, cfg, filecfg) }
 		end
 		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, 'clangtidy_cc', 'cc'), { filepath }, pch_dependency, regular_file_dependencies, vars)
 	elseif shouldcompileascpp(filecfg) then
@@ -555,8 +549,7 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 		objfiles[#objfiles + 1] = objfilename
 		local vars = {}
 		if has_custom_settings then
-			cxxflags = 'CXXFLAGS = $CXXFLAGS ' .. getcxxflags(toolset, cfg, filecfg)
-			vars = { cxxflags }
+			vars = { 'CXXFLAGS = $CXXFLAGS ' .. getcxxflags(toolset, cfg, filecfg) }
 		end
 		ninja.add_build(cfg, objfilename, {}, iif(use_clangtidy, 'clangtidy_cxx', 'cxx'), { filepath }, pch_dependency, regular_file_dependencies, vars)
 	elseif path.isresourcefile(filecfg.abspath) then
@@ -649,16 +642,14 @@ function ninja.generateProjectCfg(cfg)
 
 	---------------------------------------------------- figure out settings
 	local pch = nil
-	if is_c_or_cpp then
-		if toolset ~= p.tools.msc then
-			pch = p.tools.gcc.getpch(cfg)
-			if pch then
-				pch = {
-					input = pch,
-					placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
-					gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. '.gch')),
-				}
-			end
+	if is_c_or_cpp and toolset ~= p.tools.msc then
+		pch = p.tools.gcc.getpch(cfg)
+		if pch then
+			pch = {
+				input = pch,
+				placeholder = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch))),
+				gch = project.getrelative(cfg.workspace, path.join(cfg.objdir, path.getname(pch) .. '.gch')),
+			}
 		end
 	end
 
