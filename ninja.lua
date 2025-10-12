@@ -318,9 +318,11 @@ local function getldflags(toolset, cfg)
 	local ldflags = ninja.list(table.join(toolset.getLibraryDirectories(cfg), toolset.getrunpathdirs(cfg, table.join(cfg.runpathdirs, config.getsiblingtargetdirs(cfg))), toolset.getldflags(cfg), cfg.linkoptions))
 
 	-- experimental feature, change install_name of shared libs
-	--if (toolset == p.tools.clang) and (cfg.kind == p.SHAREDLIB) and ninja.endsWith(cfg.buildtarget.name, ".dylib") then
-	--	ldflags = ldflags .. " -install_name " .. cfg.buildtarget.name
-	--end
+	--[[
+	if toolset == p.tools.clang and cfg.kind == p.SHAREDLIB and cfg.buildtarget.name:endswith('.dylib') then
+		ldflags = ldflags .. ' -install_name ' .. cfg.buildtarget.name
+	end
+	--]]
 
 	return ldflags
 end
@@ -767,16 +769,6 @@ function ninja.projectCfgFilename(cfg, relative)
 		relative = ''
 	end
 	return relative .. get_key(cfg, cfg.project.filename) .. '.ninja'
-end
-
--- check if string starts with string
-function ninja.startsWith(str, starts)
-	return str:sub(0, starts:len()) == starts
-end
-
--- check if string ends with string
-function ninja.endsWith(str, ends)
-	return str:sub(-ends:len()) == ends
 end
 
 -- generate all build files for every project configuration
