@@ -105,10 +105,20 @@ function ninja.add_build(cfg, out, implicit_outputs, command, inputs, implicit_i
 	}
 end
 
-function ninja.emit_rule(name, cmds, description, opts)
+local function build_command(commands, command_sep)
+	command_sep = command_sep or '&&'
+	if #commands > 1 then
+		local command = iif(os.shell() == 'cmd', 'cmd /c ', 'sh -c ')
+		return command .. ninja.quote(table.implode(commands, '', '', ' ' .. command_sep .. '$\n            '))
+	else
+		return commands[1]
+	end
+end
+
+function ninja.emit_rule(name, command, description, opts)
 	opts = opts or {}
 	p.outln('rule ' .. name)
-	p.outln('  command = ' .. table.concat(cmds, ' &&$\n            '))
+	p.outln('  command = ' .. command)
 	p.outln('  description = ' .. description)
 	for key, value in pairs(opts) do
 		p.outln('  ' .. key .. ' = ' .. value)
@@ -231,7 +241,7 @@ function ninja.generateWorkspace(wks)
 		table.sort(args)
 
 		p.outln('# Rule')
-		ninja.emit_rule('premake', { ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' ') }, 'run premake', { generator = 'true', restat = 'true' })
+		ninja.emit_rule('premake', ninja.shesc(p.workspace.getrelative(wks, _PREMAKE_COMMAND)) .. ' --file=$in ' .. table.concat(ninja.shesc(args), ' '), 'run premake', { generator = 'true', restat = 'true' })
 		ninja.add_build(nil, 'build.ninja', subninjas, 'premake', { p.workspace.getrelative(wks, _MAIN_SCRIPT) }, {}, {}, {})
 		p.outln('')
 	end
@@ -339,12 +349,7 @@ local function prebuild_rule(cfg)
 			commands = { os.translateCommandsAndPaths('{ECHO} ' .. cfg.prebuildmessage, cfg.workspace.basedir, cfg.workspace.location) }
 		end
 		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prebuildcommands, cfg.workspace.basedir, cfg.workspace.location))
-		if #commands > 1 then
-			commands = 'sh -c ' .. ninja.quote(table.implode(commands, '', '', ';'))
-		else
-			commands = commands[1]
-		end
-		ninja.emit_rule('run_prebuild', { commands }, 'prebuild')
+		ninja.emit_rule('run_prebuild', build_command(commands, ';'), 'prebuild')
 	end
 end
 
@@ -355,12 +360,7 @@ local function prelink_rule(cfg)
 			commands = { os.translateCommandsAndPaths('{ECHO} ' .. cfg.prelinkmessage, cfg.workspace.basedir, cfg.workspace.location) }
 		end
 		commands = table.join(commands, os.translateCommandsAndPaths(cfg.prelinkcommands, cfg.workspace.basedir, cfg.workspace.location))
-		if #commands > 1 then
-			commands = 'sh -c ' .. ninja.quote(table.implode(commands, '', '', ';'))
-		else
-			commands = commands[1]
-		end
-		ninja.emit_rule('run_prelink', { commands }, 'prelink')
+		ninja.emit_rule('run_prelink', build_command(commands, ';'), 'prelink')
 	end
 end
 
@@ -371,12 +371,7 @@ local function postbuild_rule(cfg)
 			commands = { os.translateCommandsAndPaths('{ECHO} ' .. cfg.postbuildmessage, cfg.workspace.basedir, cfg.workspace.location) }
 		end
 		commands = table.join(commands, os.translateCommandsAndPaths(cfg.postbuildcommands, cfg.workspace.basedir, cfg.workspace.location))
-		if #commands > 1 then
-			commands = 'sh -c ' .. ninja.quote(table.implode(commands, '', '', ';'))
-		else
-			commands = commands[1]
-		end
-		ninja.emit_rule('run_postbuild', { commands }, 'postbuild')
+		ninja.emit_rule('run_postbuild', build_command(commands, ';'), 'postbuild')
 	end
 end
 
@@ -404,54 +399,58 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 
 	if toolset == p.tools.msc then
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('cc', { cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out' }, 'cc $out', { deps = 'msvc' })
+		local cc_command = cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out'
+		ninja.emit_rule('cc', cc_command, 'cc $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('cxx', { cxx .. ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
+		local cxx_command = cxx .. ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out'
+		ninja.emit_rule('cxx', cxx_command, 'cxx $out', { deps = 'msvc' })
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('clangtidy_cc', { 'clang-tidy $in -- -x c $CFLAGS', cc .. ' $CFLAGS /nologo /showIncludes -c /Tc$in /Fo$out' }, 'cc $out', { deps = 'msvc' })
+		ninja.emit_rule('clangtidy_cc', build_command({ 'clang-tidy $in -- -x c $CFLAGS', cc_command }, ';'), 'cc $out', { deps = 'msvc' }, ';')
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS', cxx .. ' $CXXFLAGS /nologo /showIncludes -c /Tp$in /Fo$out' }, 'cxx $out', { deps = 'msvc' })
+		ninja.emit_rule('clangtidy_cxx', build_command({ 'clang-tidy $in -- -x c++ $CFLAGS', cxx_command }, ';'), 'cxx $out', { deps = 'msvc' }, ';')
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
-		ninja.emit_rule('rc', { rc .. ' /nologo /fo$out $in $RESFLAGS' }, 'rc $out')
+		ninja.emit_rule('rc', rc .. ' /nologo /fo$out $in $RESFLAGS', 'rc $out')
 
 		if cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', { ar .. ' $in /nologo -OUT:$out' }, 'ar $out')
+			ninja.emit_rule('ar', ar .. ' $in /nologo -OUT:$out', 'ar $out')
 		else
-			ninja.emit_rule('link', { link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out' }, 'link $out')
+			ninja.emit_rule('link', link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out', 'link $out')
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include = pch and (' -include ' .. ninja.shesc(pch.placeholder)) or ''
 
 		if pch then
-			ninja.emit_rule('build_pch', { iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header') .. ' -H -MF $out.d -c -o $out $in' }, 'build_pch $out', { depfile = '$out.d', deps = 'gcc' })
+			ninja.emit_rule('build_pch', iif(cfg.language == 'C', cc .. all_cflags .. ' -x c-header', cxx .. all_cxxflags .. ' -x c++-header') .. ' -H -MF $out.d -c -o $out $in', 'build_pch $out', { depfile = '$out.d', deps = 'gcc' })
 		end
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('cc', { cc .. ' $CFLAGS' .. force_include .. ' -x c -MF $out.d -c -o $out $in' }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
+		local cc_command = cc .. ' $CFLAGS' .. force_include .. ' -x c -MF $out.d -c -o $out $in'
+		ninja.emit_rule('cc', cc_command, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('cxx', { cxx .. ' $CXXFLAGS' .. force_include .. ' -x c++ -MF $out.d -c -o $out $in' }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
+		local cxx_command = cxx .. ' $CXXFLAGS' .. force_include .. ' -x c++ -MF $out.d -c -o $out $in'
+		ninja.emit_rule('cxx', cxx_command, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('clangtidy_cc', { 'clang-tidy $in -- -x c $CFLAGS' .. force_include, cc .. ' $CFLAGS' .. force_include .. ' -x c -MF $out.d -c -o $out $in' }, 'cc $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('clangtidy_cc', build_command({ 'clang-tidy $in -- -x c $CFLAGS' .. force_include, cc_command }, ';'), 'cc $out', { depfile = '$out.d', deps = 'gcc' }, ';')
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', { 'clang-tidy $in -- -x c++ $CFLAGS' .. force_include, cxx .. ' $CXXFLAGS' .. force_include .. '-x c++ -MF $out.d -c -o $out $in' }, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
+		ninja.emit_rule('clangtidy_cxx', build_command({ 'clang-tidy $in -- -x c++ $CFLAGS' .. force_include, cxx_command }, ';'), 'cxx $out', { depfile = '$out.d', deps = 'gcc' }, ';')
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
 		if rc then
-			ninja.emit_rule('rc', { rc .. ' -i $in -o $out $RESFLAGS' }, 'rc $out')
+			ninja.emit_rule('rc', rc .. ' -i $in -o $out $RESFLAGS', 'rc $out')
 		end
 
 		if ar and cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', { ar .. ' rcs $out $in' }, 'ar $out')
+			ninja.emit_rule('ar', ar .. ' rcs $out $in', 'ar $out')
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, { '-Wl,--start-group ', ' -Wl,--end-group' }, { '', '' })
-			ninja.emit_rule('link', { link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2] }, 'link $out')
+			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2], 'link $out')
 		end
 	end
 
@@ -459,11 +458,11 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 end
 
 local function custom_command_rule()
-	ninja.emit_rule('custom_command', { '$CUSTOM_COMMAND' }, '$CUSTOM_DESCRIPTION')
+	ninja.emit_rule('custom_command', '$CUSTOM_COMMAND', '$CUSTOM_DESCRIPTION')
 end
 
 local function copy_rule()
-	ninja.emit_rule('copy', { os.translateCommands('{COPYFILE} $in $out') }, 'copy $in $out')
+	ninja.emit_rule('copy', os.translateCommands('{COPYFILE} $in $out'), 'copy $in $out')
 end
 
 local function collect_generated_files(prj, cfg)
