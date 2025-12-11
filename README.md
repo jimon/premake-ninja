@@ -1,6 +1,7 @@
 # premake-ninja
 
 [Premake](https://github.com/premake/premake-core) module to support [Ninja](https://github.com/martine/ninja), because it's awesome.
+Note recent version of premake handles ninja natively
 
 ## Usage (little reminder)
 1. Put these files in a "premake-ninja" subdirectory of [Premake search paths](https://premake.github.io/docs/Locating-Scripts/).<br>
@@ -14,7 +15,7 @@ require "premake-ninja/ninja"
 3. Generate ninja files
 
 ```sh
-premake5 ninja
+premake5 premake-ninja
 ```
 On msys2 (mingw)
 ```sh

@@ -10,7 +10,7 @@ local p = premake
 
 newaction {
 	-- Metadata for the command line and help system
-	trigger = 'ninja',
+	trigger = 'premake-ninja',
 	shortname = 'ninja',
 	description = 'Ninja is a small build system with a focus on speed',
 
@@ -57,5 +57,5 @@ newaction {
 --
 
 return function(cfg)
-	return (_ACTION == 'ninja')
+	return (_ACTION == 'premake-ninja')
 end

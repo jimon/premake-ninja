@@ -81,12 +81,12 @@ class Helper(unittest.TestCase):
 	# call premake in the test
 	def premake(self):
 		if override_compiler:
-			args = ["premake5", "--scripts=../../..", "--cc=" + override_compiler, "ninja"]
+			args = ["premake5", "--scripts=../../..", "--cc=" + override_compiler, "premake-ninja"]
 			if override_compiler == "emcc":
 				args += ["--os=emscripten"]
 			self.assertEqual(subprocess.call(args), 0, "looks like premake failed")
 		else:
-			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "ninja"]), 0, "looks like premake failed")
+			self.assertEqual(subprocess.call(["premake5", "--scripts=../../..", "premake-ninja"]), 0, "looks like premake failed")
 
 	# call ninja in the test
 	def ninja(self, target = None):
