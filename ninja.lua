@@ -529,6 +529,11 @@ local function compile_file_build(cfg, filecfg, toolset, pch_dependency, regular
 	local has_custom_settings = fileconfig.hasFileSettings(filecfg)
 	local use_clangtidy = filecfg.clangtidy or (filecfg.clangtidy == nil and cfg.clangtidy)
 
+	if use_clangtidy and toolset == p.tools.msc then
+		premake.warnOnce('clang-tidy_msc', 'Turn off clang-tidy when using msc (flags might differ too much between the tools).')
+		use_clangtidy = false
+	end
+
 	if filecfg.buildaction == 'None' then
 		return
 	elseif filecfg.buildaction == 'Copy' then
