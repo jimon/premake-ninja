@@ -418,7 +418,7 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		if cfg.kind == p.STATICLIB then
 			ninja.emit_rule('ar', ar .. ' $in /nologo -OUT:$out', 'ar $out')
 		else
-			ninja.emit_rule('link', link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out', 'link $out')
+			ninja.emit_rule('link', link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, false))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out', 'link $out')
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include = pch and (' -include ' .. ninja.shesc(pch.placeholder)) or ''
@@ -450,7 +450,7 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 			ninja.emit_rule('ar', ar .. ' rcs $out $in', 'ar $out')
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, { '-Wl,--start-group ', ' -Wl,--end-group' }, { '', '' })
-			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2], 'link $out')
+			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, false, true))) .. all_ldflags .. groups[2], 'link $out')
 		end
 	end
 
@@ -730,7 +730,7 @@ function ninja.generateProjectCfg(cfg)
 		end
 
 		local deps = table.join(final_dependency, extrafiles, prelink_dependency)
-		ninja.add_build(cfg, cfg_output, extra_outputs, command_rule, table.join(objfiles, libs), {}, deps, {})
+		ninja.add_build(cfg, cfg_output, extra_outputs, command_rule, objfiles, {}, table.join(deps, libs), {})
 		outputs = { cfg_output }
 	else
 		local handler = ninja.handlers[cfg.language]
