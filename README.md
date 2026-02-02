@@ -9,7 +9,7 @@ Note recent version of premake handles ninja natively
 2. Adapt your premake5.lua script, or better: create/adapt your [premake-system.lua](https://premake.github.io/docs/System-Scripts/)
 
 ```lua
-require "premake-ninja/ninja"
+require "premake-ninja/premake-ninja"
 ```
 
 3. Generate ninja files
@@ -19,7 +19,7 @@ premake5 premake-ninja
 ```
 On msys2 (mingw)
 ```sh
-premake5 ninja --cc=gcc --shell=posix
+premake5 premake-ninja --cc=gcc --shell=posix
 ```
 
 4. Run ninja

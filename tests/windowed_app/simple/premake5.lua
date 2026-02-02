@@ -1,4 +1,4 @@
-require "ninja"
+require "premake-ninja"
 
 solution "ninjatestsln"
 	location "build"
