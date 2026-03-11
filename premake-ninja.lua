@@ -416,9 +416,9 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		ninja.emit_rule('rc', rc .. ' /nologo /fo$out $in $RESFLAGS', 'rc $out')
 
 		if cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', ar .. ' $in /nologo -OUT:$out', 'ar $out')
+			ninja.emit_rule('ar', ar .. ' @$out.rsp /nologo -OUT:$out', 'ar $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
 		else
-			ninja.emit_rule('link', link .. ' $in ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out', 'link $out')
+			ninja.emit_rule('link', link .. ' @$out.rsp ' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true))) .. ' /link ' .. all_ldflags .. ' /nologo /out:$out', 'link $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
 		end
 	elseif toolset == p.tools.clang or toolset == p.tools.gcc or toolset == p.tools.emcc then
 		local force_include = pch and (' -include ' .. ninja.shesc(pch.placeholder)) or ''
@@ -436,10 +436,10 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		ninja.emit_rule('cxx', cxx_command, 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CFLAGS', all_cflags)
-		ninja.emit_rule('clangtidy_cc', build_command({ 'clang-tidy $in -- -x c $CFLAGS' .. force_include, cc_command }, ';'), 'cc $out', { depfile = '$out.d', deps = 'gcc' }, ';')
+		ninja.emit_rule('clangtidy_cc', build_command({ 'clang-tidy $in -- -x c $CFLAGS' .. force_include, cc_command }, ';'), 'cc $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('CXXFLAGS', all_cxxflags)
-		ninja.emit_rule('clangtidy_cxx', build_command({ 'clang-tidy $in -- -x c++ $CFLAGS' .. force_include, cxx_command }, ';'), 'cxx $out', { depfile = '$out.d', deps = 'gcc' }, ';')
+		ninja.emit_rule('clangtidy_cxx', build_command({ 'clang-tidy $in -- -x c++ $CFLAGS' .. force_include, cxx_command }, ';'), 'cxx $out', { depfile = '$out.d', deps = 'gcc' })
 
 		ninja.emit_flags('RESFLAGS', all_resflags)
 		if rc then
@@ -447,10 +447,10 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		end
 
 		if ar and cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', ar .. ' rcs $out $in', 'ar $out')
+			ninja.emit_rule('ar', ar .. ' rcs $out @$out.rsp', 'ar $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, { '-Wl,--start-group ', ' -Wl,--end-group' }, { '', '' })
-			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '$in' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2], 'link $out')
+			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '@$out.rsp' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2], 'link $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
 		end
 	end
 
