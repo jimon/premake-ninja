@@ -447,7 +447,11 @@ local function c_cpp_compilation_rules(cfg, toolset, pch)
 		end
 
 		if ar and cfg.kind == p.STATICLIB then
-			ninja.emit_rule('ar', ar .. ' rcs $out @$out.rsp', 'ar $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
+			if os.target() == 'macosx' then -- doesn't support response file
+				ninja.emit_rule('ar', ar .. ' rcs $out $in', 'ar $out')
+			else
+				ninja.emit_rule('ar', ar .. ' rcs $out @$out.rsp', 'ar $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
+			end
 		else
 			local groups = iif(cfg.linkgroups == premake.ON, { '-Wl,--start-group ', ' -Wl,--end-group' }, { '', '' })
 			ninja.emit_rule('link', link .. ' -o $out ' .. groups[1] .. '@$out.rsp' .. ninja.list(ninja.shesc(toolset.getlinks(cfg, true, true))) .. all_ldflags .. groups[2], 'link $out', { rspfile = '$out.rsp', rspfile_content = '$in_newline' })
