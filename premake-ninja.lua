@@ -478,7 +478,7 @@ local function collect_generated_files(prj, cfg)
 				generated_files = table.join(generated_files, outputs)
 			end
 			local filecfg = fileconfig.getconfig(node, cfg)
-			if not filecfg or filecfg.flags.ExcludeFromBuild then
+			if not filecfg or filecfg.excludefrombuild then
 				return
 			end
 			local rule = p.global.getRuleForFile(node.name, prj.rules)
@@ -582,7 +582,7 @@ local function files_build(prj, cfg, toolset, pch_dependency, regular_file_depen
 	tree.traverse(project.getsourcetree(prj), {
 		onleaf = function(node, depth)
 			local filecfg = fileconfig.getconfig(node, cfg)
-			if not filecfg or filecfg.flags.ExcludeFromBuild then
+			if not filecfg or filecfg.excludefrombuild then
 				return
 			end
 			local rule = p.global.getRuleForFile(node.name, prj.rules)
